@@ -1,0 +1,37 @@
+PEDIDO DE IMPRESSÃO 3D - case "z3ck 031" (12 peças, 12 arquivos STL)
+
+Os arquivos já estão na orientação de impressão (face plana em Z=0). Favor NÃO girar.
+Unidade: milímetros.
+
+MATERIAL: PETG (todas as peças)
+  - Se não houver PETG: PLA+ / PLA Tough. Evitar PLA "silk".
+CAMADA: 0,16 mm (0,12 mm nas peças 02 e 03, por causa dos textos)
+PAREDES: 4 perímetros | PREENCHIMENTO: 20%
+SUPORTE: não precisa (nenhuma peça usa suporte)
+
+CORES (3 cores):
+  PRETO fosco ......... 01, 04, 05, 08, 09
+  MAGENTA / rosa neon . 02, 03, 06, 07, 10
+  CIANO ............... 11, 12
+
+ARQUIVO                                     QTD  COR       TAMANHO (mm)
+01_D1R_tampa_PRETO.stl                       1   preto     84 x 66 x 13
+02_D2R_moldura_logo_MAGENTA.stl              1   magenta   10 x 56 x 4
+03_C2_placa_traseira_logo_MAGENTA.stl        1   magenta   84 x 56 x 2
+04_C3R_janela_traseira_PRETO.stl             1   preto     56 x 17 x 2
+05_S1L_capa_do_Cap_vazada_PRETO.stl          1   preto     89 x 13 x 37
+06_L1L_dobradica_esq_MAGENTA.stl             1   magenta    8 x 11 x 9
+07_R1L_dobradica_dir_MAGENTA.stl             1   magenta    8 x 11 x 16
+08_B1_base_PRETO.stl                         1   preto     87 x 58 x 15
+09_K1_pezinho_PRETO.stl                      1   preto     50 x 15 x 12
+10_K2_pezinho_MAGENTA.stl                    1   magenta   50 x 30 x 4
+11_T1_trava_1_CIANO.stl                      1   ciano      6 x 15 x 6
+12_T1_trava_2_CIANO.stl                      1   ciano      6 x 15 x 6
+
+ATENÇÃO peça 03 (placa do logo): o texto "z3ck 031" é vazado; imprimir com a face que está na mesa
+virada para baixo (como no arquivo) para o texto sair limpo.
+
+OPCIONAL (peça 02, se a gráfica fizer troca de filamento):
+  Logo "z3ck 031" bicolor. Imprimir em MAGENTA até 0,6 mm de altura e trocar para CIANO
+  (pausa/M600) a partir de 0,6 mm. As letras gravadas na face de baixo ficam ciano.
+  Se não fizer troca, imprimir tudo em magenta.

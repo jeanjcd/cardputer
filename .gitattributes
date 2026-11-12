@@ -1,0 +1,11 @@
+# arquivos CAD/3D/imagens: nunca converter quebras de linha
+*.stl binary
+*.step binary
+*.stp binary
+*.3mf binary
+*.f3d binary
+*.glb binary
+*.png binary
+*.jpg binary
+*.zip binary
+*.pptx binary

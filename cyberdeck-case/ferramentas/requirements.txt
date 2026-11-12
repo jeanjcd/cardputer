@@ -1,0 +1,15 @@
+# ambiente usado para gerar e testar o kit z3ck 031 (Python 3.12)
+trimesh==4.*
+manifold3d>=3.0
+numpy
+scipy
+shapely>=2.0
+scikit-image
+matplotlib
+vtk
+pillow
+rtree
+networkx
+fast_simplification
+cadquery==2.8.0
+pytest

@@ -1,0 +1,17 @@
+Cardputer ADV z3ck V9 - REVISAO MECANICA / NAO HOMOLOGADO
+
+Referencias oficiais: dimensoes externas Cardputer ADV 84 x 54 x 19.6 mm, desenho dimensional M5Stack.
+STL em milimetros. Base envelope 84 x 54 mm; altura maxima 21.5 mm com dobradicas.
+Base e cada braco sao malhas fechadas e conectadas individualmente (1 componente por STL).
+O logo z3ck e vazado e espelhado para leitura pela face inferior.
+A base tem nervuras laterais, ventilacao, janela central traseira e furos M3 nas dobradicas.
+Material sugerido PETG. Hardware previsto: 2 parafusos M3, arruelas de nylon e 2 porcas M3 autotravantes; comprimentos dependem da montagem.
+
+IMPORTANTE - NAO AUTORIZAR FABRICACAO DEFINITIVA SEM CONFERENCIA:
+1) A superficie de contato foi aproximada a partir de medidas externas, nao derivada do CAD original do Cardputer ADV.
+2) A placa TFT ILI9341 de 2.8 polegadas nao foi medida e os bracos ainda nao possuem grampos especificos para ela.
+3) A interferencia entre tampa e teclado, o angulo real de 110 graus e a estabilidade da friccao nao foram comprovados em montagem.
+4) A janela traseira nao comprova encaixe real do LoRa-1262 e sua antena.
+5) A espessura das paredes dentro do envelope 84mm pode impedir encaixe no Cardputer sem ajuste de projeto.
+
+Esses STL documentam a revisao geometrica, mas nao sao um kit pronto para montagem garantida.

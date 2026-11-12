@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# cyberdeck-case: cache de voxels (~400 MB, regenerado por ferramentas/gerar_z3ck031.py em ~25 min)
+cyberdeck-case/.cache_z3ck031/
+
+# sistema
+Thumbs.db
+desktop.ini
+.DS_Store
