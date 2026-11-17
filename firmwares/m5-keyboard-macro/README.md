@@ -1,4 +1,4 @@
-# ble-macro (M5-Keyboard)
+# M5-Keyboard-Macro
 
 Firmware para o Cardputer-Adv que vira um **teclado + mouse Bluetooth** e roda uma macro em loop.
 
