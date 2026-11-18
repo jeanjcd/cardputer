@@ -26,6 +26,7 @@
 - Limits: node DB 100 in RAM (evict oldest), 50 peers persisted (name+key), 30 msgs/conversation, dedup 64 `(from,id)`.
 - Screen 240×135 landscape at rotation 0 (never `setRotation(1)`).
 - No Claude attribution in commits/PRs. Commits as `jeanjcd`.
+- **Security (Jean's requirement, applies to every task):** every byte from the radio is untrusted — bounds-check everything, no dynamic allocation in the RX/parse path, never read/write past buffers, no `strcpy/sprintf` (use bounded variants), fixed-size buffers with explicit caps; secrets (private key, derived shared keys) are wiped with a non-elidable zeroize after use and never printed/logged/displayed (Config screen shows only the public key); constant-time tag comparison; key generation uses true hardware entropy (`bootloader_random_enable()` around `esp_fill_random()` since Wi-Fi/BT are off); dependencies pinned to exact versions; no network stack (Wi-Fi/BLE stay off) so LoRa is the only remote input.
 - **Open-source ready:** code, identifiers and code comments in **English**; the folder `firmwares/m5-mesh-hello/` must be self-contained (builds and tests from inside it) so it can later move to its own public repo. `src/mesh/` must not include Arduino/M5 headers (portable protocol core). Public headers get a one-line doc comment per function.
 
 ## Review Focus
@@ -222,7 +223,16 @@
 
 ### Task 8: Open-source packaging + CI
 
-**Files:** Create `firmwares/m5-mesh-hello/LICENSE` (license chosen by Jean; default GPL-3.0), `CONTRIBUTING.md`, `CHANGELOG.md` (0.1.0), `docs/protocol.md` (the wire format, crypto and frequency facts from design.md, written as a reference for implementers, with source links), bilingual `README.md` (EN first, then PT-BR); Create `.github/workflows/m5-mesh-hello.yml` at repo root (on push/PR touching the folder: setup Python, `pip install platformio`, `pio test -e native`, `pio run -e cardputer`, upload `firmware.bin` artifact).
+**Files:** Create `firmwares/m5-mesh-hello/LICENSE` (**GPL-3.0**, decided by Jean), `CONTRIBUTING.md`, `CHANGELOG.md` (0.1.0), bilingual `README.md` (EN first, then PT-BR; short: what it is, screenshot/ASCII of screens, quick start, links into docs/), and a **structured documentation set** in `docs/` (English, with a `docs/README.md` index; PT-BR summary at the top of the index):
+- `docs/user-guide.md` — install via M5Launcher, first boot, screens and keys, auto-greet rules, settings (region/power/greeting), troubleshooting (no nodes heard, which region, antenna).
+- `docs/hardware.md` — Cardputer-Adv + Cap LoRa-1262 pin map, PI4IOE antenna switch, TCXO, shared SPI/I²C, antenna and range advice (868 vs 915 MHz antenna analysis from design.md).
+- `docs/protocol.md` — wire format, frequency computation, channel CTR, PKI (X25519/SHA-256/AES-CCM, nonce layouts), protobuf subset, ACKs, first-key-wins — a reference for implementers, with source links to Meshtastic code/docs.
+- `docs/architecture.md` — module map (`src/mesh`, `src/hw`, `src/app`), data flow RX→parse→NodeDb/Chat/Greeter→Outbox→TX, persistence keys (NVS), limits.
+- `docs/development.md` — toolchain (PlatformIO, WinLibs/GCC for native tests), build, native tests, regenerating vectors, CI, release `.bin` steps, coding conventions.
+- `docs/security.md` — threat model (remote attacker over LoRa, malicious node, physical access, supply chain), what is protected and what is NOT (private key in NVS is readable with physical access because flash encryption is off under M5Launcher; public channel is readable by anyone by design; no signatures in v1), mitigations, how to verify a release (`SHA256SUMS`).
+- `SECURITY.md` (folder root) — supported versions and how to report a vulnerability privately (GitHub private vulnerability reporting).
+- `docs/roadmap.md` — v2 ideas (GPS/position, more channels, signatures, relay), known limitations.
+- Keep `docs/design.md` and `docs/plano.md` as historical design records (linked from the index). Create `.github/workflows/m5-mesh-hello.yml` at repo root (on push/PR touching the folder, `permissions: contents: read`, actions pinned to full commit SHAs): setup Python, `pip install platformio==<pinned>`, `pio test -e native`, **`pio test -e native_sanitize`** (new env on Linux CI: `-fsanitize=address,undefined -fno-sanitize-recover=all -g`), `pio run -e cardputer`, generate `SHA256SUMS` for the `.bin` files, upload artifacts. Add `.github/dependabot.yml` (github-actions ecosystem, weekly). Add a **fuzz-style test** `test/test_fuzz/` (native): 200k iterations of seeded random and mutated valid frames through `parseFrame`/`pbDecode*`/`headerParse` asserting no crash and no out-of-bounds (run under the sanitizer env in CI). Add a CodeQL workflow for C/C++ (build-mode manual using the native env).
 
 - [ ] **Step 1:** Write files; workflow uses `working-directory: firmwares/m5-mesh-hello`.
 - [ ] **Step 2:** Validate locally: `python -m platformio test -e native` PASS and `python -m platformio run -e cardputer` SUCCESS from inside the folder.
