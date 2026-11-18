@@ -17,68 +17,68 @@ size_t utf8Trim(const char* s, size_t len) {
 }  // namespace
 
 void ChatMsg::setText(const char* s) {
+  char tmp[sizeof text];  // copy first: s may point into text itself
   size_t n = 0;
-  while (n < sizeof text - 1 && s[n]) n++;
-  n = utf8Trim(s, n);
-  memcpy(text, s, n);
-  memset(text + n, 0, sizeof text - n);
-}
-
-const ChatStore::Conv* ChatStore::findConv(uint32_t peer) const {
-  for (size_t i = 0; i < nConvs_; i++) if (convs_[i].peer == peer) return &convs_[i];
-  return nullptr;
+  while (n < sizeof text - 1 && s[n]) { tmp[n] = s[n]; n++; }
+  n = utf8Trim(tmp, n);
+  memset(text, 0, sizeof text);
+  memcpy(text, tmp, n);
 }
 
 void ChatStore::add(uint32_t peer, const ChatMsg& in) {
-  Conv* c = const_cast<Conv*>(findConv(peer));
-  if (!c) {
-    size_t slot;
-    if (nConvs_ < kMaxConvs) slot = nConvs_++;
-    else {
-      slot = 0;
-      for (size_t i = 1; i < kMaxConvs; i++) if ((int32_t)(convs_[i].seq - convs_[slot].seq) < 0) slot = i;
-    }
-    c = &convs_[slot];
-    c->peer = peer; c->n = 0;
-  }
-  c->seq = ++seq_;
-  if (c->n == kMaxMsgs) {
-    for (size_t i = 0; i + 1 < kMaxMsgs; i++) c->m[i] = c->m[i + 1];
-    c->n--;
-  }
-  ChatMsg& m = c->m[c->n++];
-  m = in;
-  // Re-sanitize: caller may not have NUL-terminated or cut at a character boundary.
+  ChatMsg m = in;  // local copy: `in` may alias a pool slot we are about to free
   char tmp[sizeof m.text];
   memcpy(tmp, in.text, sizeof tmp);
   tmp[sizeof tmp - 1] = 0;
   m.setText(tmp);
+
+  size_t cnt = 0, oldestOfPeer = kPoolSize, free_ = kPoolSize, oldestAll = kPoolSize;
+  for (size_t i = 0; i < kPoolSize; i++) {
+    const Slot& s = pool_[i];
+    if (!s.used) { if (free_ == kPoolSize) free_ = i; continue; }
+    if (oldestAll == kPoolSize || (int32_t)(s.seq - pool_[oldestAll].seq) < 0) oldestAll = i;
+    if (s.peer == peer) {
+      cnt++;
+      if (oldestOfPeer == kPoolSize || (int32_t)(s.seq - pool_[oldestOfPeer].seq) < 0) oldestOfPeer = i;
+    }
+  }
+  size_t slot;
+  if (cnt >= kMaxMsgs) slot = oldestOfPeer;        // per-peer cap: reuse that peer's oldest
+  else if (free_ != kPoolSize) slot = free_;
+  else slot = oldestAll;                           // pool full: evict the globally oldest
+  Slot& s = pool_[slot];
+  s.used = true; s.peer = peer; s.seq = ++seq_; s.m = m;
 }
 
 ChatMsg* ChatStore::findById(uint32_t id) {
   if (id == 0) return nullptr;
-  for (size_t i = 0; i < nConvs_; i++)
-    for (size_t j = 0; j < convs_[i].n; j++)
-      if (convs_[i].m[j].id == id) return &convs_[i].m[j];
+  for (size_t i = 0; i < kPoolSize; i++)
+    if (pool_[i].used && pool_[i].m.id == id) return &pool_[i].m;
   return nullptr;
 }
 
 void ChatStore::markAcked(uint32_t packetId) {
   if (packetId == 0) return;
-  for (size_t i = 0; i < nConvs_; i++)
-    for (size_t j = 0; j < convs_[i].n; j++) {
-      ChatMsg& m = convs_[i].m[j];
-      if (m.id == packetId && m.mine && m.state == ChatMsg::Sent) { m.state = ChatMsg::Acked; return; }
-    }
+  for (size_t i = 0; i < kPoolSize; i++) {
+    ChatMsg& m = pool_[i].m;
+    if (pool_[i].used && m.id == packetId && m.mine && m.state == ChatMsg::Sent) { m.state = ChatMsg::Acked; return; }
+  }
 }
 
 size_t ChatStore::count(uint32_t peer) const {
-  const Conv* c = findConv(peer);
-  return c ? c->n : 0;
+  size_t n = 0;
+  for (size_t i = 0; i < kPoolSize; i++) if (pool_[i].used && pool_[i].peer == peer) n++;
+  return n;
 }
 
-const ChatMsg& ChatStore::at(uint32_t peer, size_t i) const {
+const ChatMsg& ChatStore::at(uint32_t peer, size_t idx) const {
   static const ChatMsg empty = {};
-  const Conv* c = findConv(peer);
-  return (c && i < c->n) ? c->m[i] : empty;
+  for (size_t i = 0; i < kPoolSize; i++) {
+    if (!pool_[i].used || pool_[i].peer != peer) continue;
+    size_t rank = 0;  // number of this peer's messages older than this one
+    for (size_t j = 0; j < kPoolSize; j++)
+      if (pool_[j].used && pool_[j].peer == peer && (int32_t)(pool_[j].seq - pool_[i].seq) < 0) rank++;
+    if (rank == idx) return pool_[i].m;
+  }
+  return empty;
 }

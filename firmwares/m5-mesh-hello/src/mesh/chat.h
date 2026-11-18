@@ -13,16 +13,17 @@ struct ChatMsg {
   void setText(const char* s);
 };
 
-/// Per-peer conversation history: 30 messages each (oldest dropped); peer 0xFFFFFFFF is the public channel.
-/// At most kMaxConvs conversations are kept in RAM; the least recently active one is dropped for a new peer.
+/// Chat history in ONE shared pool of 96 message slots, each tagged with its peer (0xFFFFFFFF = public channel).
+/// Per-peer cap is 30 (a 31st message drops that peer's oldest); when the pool is full the globally oldest message is
+/// evicted, so no conversation is ever dropped as a unit.
 /// Read-only iteration: count(peer) then at(peer, i) for i in [0, count), oldest first.
 class ChatStore {
  public:
-  static constexpr size_t kMaxMsgs = 30;
-  static constexpr size_t kMaxConvs = 8;
+  static constexpr size_t kMaxMsgs = 30;   // per peer
+  static constexpr size_t kPoolSize = 96;  // total
   static constexpr uint32_t kPublic = 0xFFFFFFFF;
 
-  /// Appends a message to the peer's conversation (text is sanitized/truncated), dropping the oldest at cap.
+  /// Appends a message to the peer's conversation (text is sanitized/truncated); `m` may alias stored data.
   void add(uint32_t peer, const ChatMsg& m);
   /// Moves one of our own messages with this packet id from Sent to Acked; no-op otherwise.
   void markAcked(uint32_t packetId);
@@ -34,9 +35,7 @@ class ChatStore {
   const ChatMsg& at(uint32_t peer, size_t i) const;
 
  private:
-  struct Conv { uint32_t peer; uint32_t seq; size_t n; ChatMsg m[kMaxMsgs]; };
-  const Conv* findConv(uint32_t peer) const;
-  Conv convs_[kMaxConvs] = {};
-  size_t nConvs_ = 0;
+  struct Slot { uint32_t peer; uint32_t seq; bool used; ChatMsg m; };
+  Slot pool_[kPoolSize] = {};
   uint32_t seq_ = 0;
 };

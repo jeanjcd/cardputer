@@ -17,7 +17,9 @@ struct FakeKv : Kv {
     memcpy(buf, it->second.data(), len);
     return true;
   }
+  bool failPut = false;
   bool put(const char* k, const void* buf, size_t len) override {
+    if (failPut) return false;
     if (strlen(k) > 15) return false;  // NVS key limit
     const uint8_t* p = (const uint8_t*)buf;
     m[k] = std::vector<uint8_t>(p, p + len);
@@ -253,6 +255,80 @@ void test_outbox_known_key_fifo_and_cap() {
   TEST_ASSERT_TRUE(ob.queueDirect(mkItem(3, "z", 99), true));    // room again
 }
 
+static ChatMsg mkMsg(uint32_t id, bool mine = false) {
+  ChatMsg m; memset(&m, 0, sizeof m); m.id = id; m.mine = mine; m.state = ChatMsg::Sent; strcpy(m.text, "x"); return m;
+}
+
+void test_chat_pool_evicts_globally_oldest() {
+  ChatStore cs;
+  for (uint32_t i = 1; i <= 96; i++) cs.add(1000 + (i % 4), mkMsg(i));  // 4 peers x 24
+  cs.add(2000, mkMsg(500));
+  TEST_ASSERT_NULL(cs.findById(1));          // globally oldest gone
+  TEST_ASSERT_NOT_NULL(cs.findById(2));
+  TEST_ASSERT_NOT_NULL(cs.findById(500));
+  cs.add(2000, mkMsg(501));
+  TEST_ASSERT_NULL(cs.findById(2));
+}
+
+void test_chat_public_survives_dm_flood() {
+  ChatStore cs;
+  for (uint32_t i = 1; i <= 5; i++) cs.add(ChatStore::kPublic, mkMsg(i));
+  for (uint32_t p = 1; p <= 12; p++)
+    for (uint32_t k = 0; k < 10; k++) cs.add(p, mkMsg(100 + p * 10 + k));  // 120 DMs from 12 peers
+  // pool is 96: only the oldest-by-seq went, i.e. public msgs first, then oldest DMs; no unit drop
+  size_t total = cs.count(ChatStore::kPublic);
+  for (uint32_t p = 1; p <= 12; p++) total += cs.count(p);
+  TEST_ASSERT_EQUAL_UINT32(96, total);
+  TEST_ASSERT_EQUAL_UINT32(0, cs.count(ChatStore::kPublic));  // oldest 5 + 19 DMs evicted
+  TEST_ASSERT_EQUAL_UINT32(0, cs.count(1));
+  TEST_ASSERT_EQUAL_UINT32(10, cs.count(12));
+  // fresher public traffic is kept alongside the flood
+  ChatStore c2;
+  for (uint32_t p = 1; p <= 12; p++) for (uint32_t k = 0; k < 8; k++) c2.add(p, mkMsg(100 + p * 10 + k));
+  for (uint32_t i = 1; i <= 5; i++) c2.add(ChatStore::kPublic, mkMsg(i));
+  for (uint32_t p = 13; p <= 20; p++) c2.add(p, mkMsg(900 + p));
+  TEST_ASSERT_EQUAL_UINT32(5, c2.count(ChatStore::kPublic));
+}
+
+void test_chat_per_peer_cap_and_order() {
+  ChatStore cs;
+  for (uint32_t i = 1; i <= 40; i++) { cs.add(7, mkMsg(i)); cs.add(8, mkMsg(1000 + i)); }
+  TEST_ASSERT_EQUAL_UINT32(30, cs.count(7));
+  TEST_ASSERT_EQUAL_UINT32(30, cs.count(8));
+  for (size_t i = 0; i < 30; i++) {
+    TEST_ASSERT_EQUAL_UINT32(11 + i, cs.at(7, i).id);
+    TEST_ASSERT_EQUAL_UINT32(1011 + i, cs.at(8, i).id);
+  }
+  TEST_ASSERT_EQUAL_UINT32(0, cs.at(7, 30).id);
+}
+
+void test_chat_settext_alias() {
+  ChatMsg m; memset(&m, 0, sizeof m); strcpy(m.text, "hello");
+  m.setText(m.text + 1);
+  TEST_ASSERT_EQUAL_STRING("ello", m.text);
+  ChatStore cs; cs.add(1, mkMsg(1));
+  cs.add(1, cs.at(1, 0));  // aliasing stored data
+  TEST_ASSERT_EQUAL_UINT32(2, cs.count(1));
+}
+
+void test_greeter_persist_failure_keeps_queued() {
+  FakeKv kv; Greeter g(kv); g.setEnabled(true);
+  g.onNodeWithKey(5);
+  uint32_t n = 0;
+  kv.failPut = true;
+  TEST_ASSERT_FALSE(g.due(0, n));
+  TEST_ASSERT_FALSE(g.wasGreeted(5));
+  kv.failPut = false;
+  TEST_ASSERT_TRUE(g.due(1, n));
+  TEST_ASSERT_EQUAL_UINT32(5, n);
+}
+
+void test_sizes() {
+  printf("sizeof ChatStore=%u NodeDb=%u Greeter=%u Outbox=%u\n", (unsigned)sizeof(ChatStore),
+         (unsigned)sizeof(NodeDb), (unsigned)sizeof(Greeter), (unsigned)sizeof(Outbox));
+  TEST_ASSERT_TRUE(sizeof(ChatStore) <= 22 * 1024);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_touch_and_evict_oldest);
@@ -262,6 +338,12 @@ int main() {
   RUN_TEST(test_corrupt_blobs_load_empty);
   RUN_TEST(test_chat_cap_and_ack);
   RUN_TEST(test_chat_utf8_truncation);
+  RUN_TEST(test_chat_pool_evicts_globally_oldest);
+  RUN_TEST(test_chat_public_survives_dm_flood);
+  RUN_TEST(test_chat_per_peer_cap_and_order);
+  RUN_TEST(test_chat_settext_alias);
+  RUN_TEST(test_greeter_persist_failure_keeps_queued);
+  RUN_TEST(test_sizes);
   RUN_TEST(test_greeter_disabled_ignores);
   RUN_TEST(test_greeter_once_per_node);
   RUN_TEST(test_greeter_rate_and_queue);

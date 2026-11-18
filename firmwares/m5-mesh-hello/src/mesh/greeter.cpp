@@ -24,12 +24,12 @@ void Greeter::load() {
   gn_ = n;
 }
 
-void Greeter::persist() {
+bool Greeter::persist() {
   uint8_t b[kBlob]; memset(b, 0, sizeof b);
   b[0] = kVer; b[1] = (uint8_t)gn_; b[2] = (uint8_t)(gn_ >> 8);
   for (size_t i = 0; i < gn_; i++)
     for (int k = 0; k < 4; k++) b[3 + i * 4 + k] = (uint8_t)(greeted_[i] >> (8 * k));
-  kv_.put("greeted", b, kBlob);
+  return kv_.put("greeted", b, kBlob);
 }
 
 void Greeter::setEnabled(bool on) {
@@ -56,11 +56,11 @@ void Greeter::onNodeWithKey(uint32_t num) {
 bool Greeter::due(uint32_t nowMs, uint32_t& outNum) {
   if (!enabled_ || qn_ == 0 || gn_ >= persistCap_) return false;
   if (haveLast_ && (uint32_t)(nowMs - last_) < interval_) return false;
+  greeted_[gn_++] = q_[0];
+  if (!persist()) { gn_--; return false; }  // never hand out a node we could not record as greeted
   outNum = q_[0];
   for (size_t i = 0; i + 1 < qn_; i++) q_[i] = q_[i + 1];
   qn_--;
-  greeted_[gn_++] = outNum;
-  persist();
   haveLast_ = true; last_ = nowMs;
   return true;
 }

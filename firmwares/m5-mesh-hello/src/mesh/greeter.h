@@ -23,14 +23,14 @@ class Greeter {
   bool enabled() const { return enabled_; }
   /// Enqueues a node if enabled, not greeted, not already queued, queue not full and the greeted set not full.
   void onNodeWithKey(uint32_t num);
-  /// If the interval elapsed since the last greeting, pops the oldest queued node into outNum, marks it greeted, persists and returns true.
+  /// If the interval elapsed since the last greeting, pops the oldest queued node into outNum, marks it greeted, persists and returns true; if persisting fails it returns false and keeps the node queued.
   bool due(uint32_t nowMs, uint32_t& outNum);
   /// True if the node is in the greeted set.
   bool wasGreeted(uint32_t num) const;
 
  private:
   bool queued(uint32_t num) const;
-  void persist();
+  bool persist();
   Kv& kv_;
   uint32_t interval_;
   size_t queueCap_, persistCap_;
