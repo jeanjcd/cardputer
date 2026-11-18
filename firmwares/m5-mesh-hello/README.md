@@ -74,7 +74,7 @@ Details: [docs/en/hardware.md](docs/en/hardware.md).
 
 ## Regions
 
-The default is **ANZ** (919.875 MHz), which the Brazilian Meshtastic community uses. Brazil's official Meshtastic region is BR_902 (903.875 MHz). The firmware also supports US, EU_868, RU, KR, UA_868, MY_919, SG_923, PH_868 and PH_915, plus the experimental IN, NZ_865, NP_865, KZ_863, JP, TW and TH (slightly outside the Cap's rated band). **Always use the region of the country you are in.** The full table, the frequency formula, power limits and duty cycle are in [docs/en/frequencies.md](docs/en/frequencies.md).
+The default is **ANZ** (919.875 MHz), which the Brazilian Meshtastic community uses. Brazil's official Meshtastic region is BR_902 (903.875 MHz). The firmware also supports US, EU_868, RU, KR, UA_868, MY_919, SG_923, PH_868 and PH_915, plus the experimental IN, NZ_865, NP_865, KZ_863, JP, TW and TH (slightly outside the Cap's rated band). **Always use the region of the country you are in.** In Japan (JP), the 920 MHz band rules (ARIB STD-T108) may require carrier sense (LBT) and transmit-time limits; this firmware does not implement LBT and has not been evaluated for conformity — check 電波法/技適 requirements yourself before transmitting in Japan. The full table, the frequency formula, power limits and duty cycle are in [docs/en/frequencies.md](docs/en/frequencies.md).
 
 ## Documentation
 
