@@ -25,9 +25,15 @@ int NodeDb::find(uint32_t num) const {
   return -1;
 }
 
+const uint8_t* NodeDb::pinned(uint32_t num) const {
+  if (num == 0) return nullptr;
+  for (size_t s = 0; s < kMaxPeers; s++) if (slotNum_[s] == num) return slotKey_[s];
+  return nullptr;
+}
+
 void NodeDb::load() {
   n_ = 0; seq_ = 0;
-  memset(slotNum_, 0, sizeof slotNum_); memset(slotSeq_, 0, sizeof slotSeq_);
+  memset(slotNum_, 0, sizeof slotNum_); memset(slotSeq_, 0, sizeof slotSeq_); memset(slotKey_, 0, sizeof slotKey_);
   for (size_t s = 0; s < kMaxPeers; s++) {
     char key[16]; slotKey(s, key);
     uint8_t r[kRec];
@@ -35,6 +41,7 @@ void NodeDb::load() {
     uint32_t num = getU32(r + 1), seq = getU32(r + 5);
     if (num == 0 || find(num) >= 0) continue;
     slotNum_[s] = num; slotSeq_[s] = seq;
+    memcpy(slotKey_[s], r + 57, 32);
     if (seq > seq_) seq_ = seq;
     NodeEntry& e = touch(num, 0, 0, 0);
     char lname[40], sname[8];
@@ -56,7 +63,16 @@ NodeEntry& NodeDb::touch(uint32_t num, int16_t rssi, float snr, uint32_t nowMs) 
   } else {
     memset(&cur, 0, sizeof cur);
     cur.num = num;
-    if (n_ == kMaxNodes) n_--;  // drop the oldest-heard (last)
+    const uint8_t* pin = pinned(num);
+    if (pin) { memcpy(cur.user.publicKey, pin, 32); cur.user.publicKeyLen = 32; cur.hasKey = true; }
+    if (n_ == kMaxNodes) {
+      // Evict the oldest keyless, non-pinned entry; if there is none, the oldest-heard (last) one.
+      size_t victim = n_ - 1;
+      for (size_t i = n_; i-- > 0;)
+        if (!e_[i].hasKey && !pinned(e_[i].num)) { victim = i; break; }
+      for (size_t i = victim; i + 1 < n_; i++) e_[i] = e_[i + 1];
+      n_--;
+    }
   }
   cur.rssi = rssi; cur.snr = snr; cur.lastHeardMs = nowMs;
   size_t pos = 0;  // first entry strictly older than us (wraparound-safe compare)
@@ -71,6 +87,8 @@ bool NodeDb::applyUser(uint32_t num, const MeshUser& u) {
   if (idx < 0) return false;
   NodeEntry& e = e_[idx];
   bool incomingKey = (u.publicKeyLen == 32);
+  const uint8_t* pin = pinned(num);  // persisted key: authoritative even if the RAM entry was evicted and re-created
+  if (pin && !(incomingKey && memcmp(pin, u.publicKey, 32) == 0)) return false;
   if (e.hasKey && !(incomingKey && memcmp(e.user.publicKey, u.publicKey, 32) == 0)) return false;
   copyStr(e.user.id, u.id); copyStr(e.user.longName, u.longName); copyStr(e.user.shortName, u.shortName);
   e.user.hwModel = u.hwModel; e.user.role = u.role;
@@ -83,7 +101,8 @@ bool NodeDb::applyUser(uint32_t num, const MeshUser& u) {
 
 const uint8_t* NodeDb::pubKey(uint32_t num) const {
   int idx = find(num);
-  return (idx >= 0 && e_[idx].hasKey) ? e_[idx].user.publicKey : nullptr;
+  if (idx >= 0 && e_[idx].hasKey) return e_[idx].user.publicKey;
+  return pinned(num);
 }
 
 void NodeDb::persistPeer(uint32_t num) {
@@ -108,4 +127,5 @@ void NodeDb::persistPeer(uint32_t num) {
   if (!kv_.put(key, r, kRec)) return;
   seq_++;
   slotNum_[slot] = num; slotSeq_[slot] = seq_;
+  memcpy(slotKey_[slot], e.user.publicKey, 32);
 }

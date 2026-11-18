@@ -78,6 +78,61 @@ void test_first_key_wins() {
   TEST_ASSERT_NULL(db.pubKey(999));
 }
 
+// Attack: flood ~100 forged keyed NodeInfos so a saved peer (loaded at boot, lastHeardMs = 0) is evicted, then
+// claim that peer's node number with another key. The persisted pin must keep the original key.
+void test_pinned_key_survives_eviction() {
+  FakeKv kv;
+  {
+    NodeDb db(kv);
+    db.touch(7, 0, 0, 1);
+    db.applyUser(7, mkUser("Alice", 0xAA));
+    db.persistPeer(7);
+  }
+  NodeDb db(kv); db.load();
+  TEST_ASSERT_NOT_NULL(db.get(7));
+  for (uint32_t i = 1000; i < 1000 + NodeDb::kMaxNodes; i++) {
+    db.touch(i, -90, 0, i);
+    TEST_ASSERT_TRUE(db.applyUser(i, mkUser("F", 0x11)));
+  }
+  TEST_ASSERT_NULL(db.get(7));                     // evicted from the RAM table (all others are keyed)
+  TEST_ASSERT_NOT_NULL(db.pubKey(7));              // ...but the pinned key is still returned
+  TEST_ASSERT_EQUAL_UINT8(0xAA, db.pubKey(7)[0]);
+  NodeEntry& e = db.touch(7, -80, 0, 5000);        // forged NodeInfo for node 7 arrives
+  TEST_ASSERT_TRUE(e.hasKey);                      // re-created entry carries the pinned key
+  TEST_ASSERT_FALSE(db.applyUser(7, mkUser("Mallory", 0xBB)));
+  TEST_ASSERT_FALSE(db.applyUser(7, mkUser("Mallory", 0, false)));
+  TEST_ASSERT_EQUAL_UINT8(0xAA, db.pubKey(7)[0]);
+  TEST_ASSERT_TRUE(db.applyUser(7, mkUser("Alice", 0xAA)));  // the real owner is still accepted
+  TEST_ASSERT_EQUAL_STRING("Alice", db.get(7)->user.longName);
+}
+
+// The pin is checked even if a RAM entry somehow has no key (defence in depth for applyUser).
+void test_pin_checked_in_apply_user() {
+  FakeKv kv;
+  { NodeDb db(kv); db.touch(9, 0, 0, 1); db.applyUser(9, mkUser("Bob", 0xCC)); db.persistPeer(9); }
+  NodeDb db(kv); db.load();
+  TEST_ASSERT_FALSE(db.applyUser(9, mkUser("Eve", 0xDD)));
+  TEST_ASSERT_EQUAL_UINT8(0xCC, db.pubKey(9)[0]);
+}
+
+// Eviction prefers keyless, non-pinned entries over keyed or pinned ones, even if those are older.
+void test_eviction_prefers_keyless() {
+  FakeKv kv; NodeDb db(kv);
+  db.touch(1, 0, 0, 1); db.applyUser(1, mkUser("K", 0x01));       // oldest, keyed
+  db.touch(2, 0, 0, 2);                                              // keyless
+  for (uint32_t i = 3; i <= NodeDb::kMaxNodes; i++) { db.touch(i, 0, 0, i); db.applyUser(i, mkUser("K", 0x02)); }
+  db.touch(500, 0, 0, 1000);
+  TEST_ASSERT_EQUAL_UINT32(NodeDb::kMaxNodes, db.count());
+  TEST_ASSERT_NULL(db.get(2));     // the keyless one went
+  TEST_ASSERT_NOT_NULL(db.get(1)); // the older keyed one stayed
+  db.touch(501, 0, 0, 1001);       // now 500 is the only keyless entry left (and newest-but-one)
+  TEST_ASSERT_NULL(db.get(500));
+  TEST_ASSERT_NOT_NULL(db.get(1));
+  db.applyUser(501, mkUser("K", 0x03));
+  db.touch(502, 0, 0, 1002);       // all keyed: oldest-heard goes
+  TEST_ASSERT_NULL(db.get(1));
+}
+
 void test_peer_persist_reload() {
   FakeKv kv; NodeDb db(kv);
   db.touch(7, 0, 0, 1);
@@ -232,9 +287,9 @@ static OutItem mkItem(uint32_t to, const char* t, uint32_t chatId) {
 
 void test_dm_waits_for_key() {
   Outbox ob; OutItem out;
-  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(9, "a", 1), false));
-  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(8, "b", 2), false));
-  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(9, "c", 3), false));
+  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(9, "a", 1), false, 0));
+  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(8, "b", 2), false, 0));
+  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(9, "c", 3), false, 0));
   TEST_ASSERT_FALSE(ob.next(out));
   ob.onKeyArrived(9);
   TEST_ASSERT_TRUE(ob.next(out)); TEST_ASSERT_EQUAL_STRING("a", out.text);
@@ -247,13 +302,69 @@ void test_dm_waits_for_key() {
 
 void test_outbox_known_key_fifo_and_cap() {
   Outbox ob; OutItem out;
-  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(1, "x", 1), false));
-  for (uint32_t i = 0; i < 9; i++) TEST_ASSERT_TRUE(ob.queueDirect(mkItem(2, "k", 10 + i), true));
-  TEST_ASSERT_FALSE(ob.queueDirect(mkItem(3, "z", 99), true));   // full (10)
-  TEST_ASSERT_FALSE(ob.queueDirect(mkItem(3, "z", 99), false));
+  for (uint32_t i = 0; i < 10; i++) TEST_ASSERT_TRUE(ob.queueDirect(mkItem(2, "k", 10 + i), true, 0));
+  uint32_t ev = 123;
+  TEST_ASSERT_FALSE(ob.queueDirect(mkItem(3, "z", 99), true, 0, &ev));   // full (10) of ready items: no eviction
+  TEST_ASSERT_EQUAL_UINT32(0, ev);
+  TEST_ASSERT_FALSE(ob.queueDirect(mkItem(3, "z", 99), false, 0));
   TEST_ASSERT_TRUE(ob.next(out));
   TEST_ASSERT_EQUAL_UINT32(10, out.chatId);
-  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(3, "z", 99), true));    // room again
+  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(3, "z", 99), true, 0));    // room again
+}
+
+// Held DMs to a node that never answers expire after 10 minutes instead of blocking the outbox forever.
+void test_outbox_held_expiry() {
+  Outbox ob; uint32_t id = 0;
+  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(9, "a", 1), false, 0xFFFFF000u));  // wraps around during its lifetime
+  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(8, "b", 2), false, 0xFFFFF000u + 60000));
+  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(7, "r", 3), true, 0xFFFFF000u));   // ready items never expire
+  TEST_ASSERT_FALSE(ob.expireOne(0xFFFFF000u + Outbox::kHeldTtlMs - 1, &id));
+  TEST_ASSERT_TRUE(ob.expireOne(0xFFFFF000u + Outbox::kHeldTtlMs, &id));
+  TEST_ASSERT_EQUAL_UINT32(1, id);
+  TEST_ASSERT_FALSE(ob.expireOne(0xFFFFF000u + Outbox::kHeldTtlMs, &id));
+  TEST_ASSERT_EQUAL_UINT32(2, ob.count());
+  TEST_ASSERT_TRUE(ob.expireOne(0xFFFFF000u + 60000 + Outbox::kHeldTtlMs, &id));
+  TEST_ASSERT_EQUAL_UINT32(2, id);
+  TEST_ASSERT_EQUAL_UINT32(1, ob.count());
+  OutItem out;
+  TEST_ASSERT_TRUE(ob.next(out));
+  TEST_ASSERT_EQUAL_UINT32(3, out.chatId);
+  ob.onKeyArrived(9);  // key of an expired item arriving late releases nothing
+  TEST_ASSERT_FALSE(ob.next(out));
+}
+
+// A ready DM that finds the outbox full evicts the oldest held item (the caller marks it failed).
+void test_outbox_full_evicts_oldest_held() {
+  Outbox ob; OutItem out; uint32_t ev = 0;
+  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(2, "r", 100), true, 0));
+  for (uint32_t i = 0; i < 9; i++) TEST_ASSERT_TRUE(ob.queueDirect(mkItem(50 + i, "h", 1 + i), false, i));
+  TEST_ASSERT_FALSE(ob.queueDirect(mkItem(60, "h", 77), false, 20, &ev));  // held cannot evict
+  TEST_ASSERT_EQUAL_UINT32(0, ev);
+  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(3, "k", 200), true, 20, &ev));
+  TEST_ASSERT_EQUAL_UINT32(1, ev);  // oldest held
+  TEST_ASSERT_TRUE(ob.queueDirect(mkItem(3, "k", 201), true, 21, &ev));
+  TEST_ASSERT_EQUAL_UINT32(2, ev);
+  TEST_ASSERT_EQUAL_UINT32(Outbox::kMax, ob.count());
+  TEST_ASSERT_TRUE(ob.next(out)); TEST_ASSERT_EQUAL_UINT32(100, out.chatId);
+  TEST_ASSERT_TRUE(ob.next(out)); TEST_ASSERT_EQUAL_UINT32(200, out.chatId);
+  TEST_ASSERT_TRUE(ob.next(out)); TEST_ASSERT_EQUAL_UINT32(201, out.chatId);
+  TEST_ASSERT_FALSE(ob.next(out));
+}
+
+void test_outbox_held_peers() {
+  Outbox ob; uint32_t peers[4];
+  TEST_ASSERT_EQUAL_UINT32(0, ob.heldPeers(peers, 4));
+  ob.queueDirect(mkItem(9, "a", 1), false, 0);
+  ob.queueDirect(mkItem(8, "b", 2), false, 0);
+  ob.queueDirect(mkItem(9, "c", 3), false, 0);
+  ob.queueDirect(mkItem(5, "d", 4), true, 0);
+  TEST_ASSERT_EQUAL_UINT32(2, ob.heldPeers(peers, 4));
+  TEST_ASSERT_EQUAL_UINT32(9, peers[0]);
+  TEST_ASSERT_EQUAL_UINT32(8, peers[1]);
+  TEST_ASSERT_EQUAL_UINT32(1, ob.heldPeers(peers, 1));
+  ob.onKeyArrived(9);
+  TEST_ASSERT_EQUAL_UINT32(1, ob.heldPeers(peers, 4));
+  TEST_ASSERT_EQUAL_UINT32(8, peers[0]);
 }
 
 static ChatMsg mkMsg(uint32_t id, bool mine = false) {
@@ -396,6 +507,9 @@ int main() {
   UNITY_BEGIN();
   RUN_TEST(test_touch_and_evict_oldest);
   RUN_TEST(test_first_key_wins);
+  RUN_TEST(test_pinned_key_survives_eviction);
+  RUN_TEST(test_pin_checked_in_apply_user);
+  RUN_TEST(test_eviction_prefers_keyless);
   RUN_TEST(test_peer_persist_reload);
   RUN_TEST(test_peer_persist_cap_overwrites_least_recent);
   RUN_TEST(test_corrupt_blobs_load_empty);
@@ -418,5 +532,8 @@ int main() {
   RUN_TEST(test_greeter_full_set_stops_greeting);
   RUN_TEST(test_dm_waits_for_key);
   RUN_TEST(test_outbox_known_key_fifo_and_cap);
+  RUN_TEST(test_outbox_held_expiry);
+  RUN_TEST(test_outbox_full_evicts_oldest_held);
+  RUN_TEST(test_outbox_held_peers);
   return UNITY_END();
 }

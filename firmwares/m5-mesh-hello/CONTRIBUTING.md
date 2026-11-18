@@ -10,6 +10,9 @@ license, GPL-3.0-or-later (see [LICENSE](LICENSE)).
 ## Development setup
 
 Everything builds and tests from inside this folder.
+The full developer documentation (toolchain, test suites, CI, release steps)
+is in [docs/en/development.md](docs/en/development.md); the architecture is
+described in [docs/en/architecture.md](docs/en/architecture.md).
 
 1. **Python 3.10+** and **PlatformIO Core** (the CI pins `platformio==6.2.0`):
 

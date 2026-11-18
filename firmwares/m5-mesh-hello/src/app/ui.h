@@ -40,6 +40,8 @@ class Ui {
   void drawChat();
   void drawChannel();
   void drawConfig();
+  void drawRegionPrompt();
+  void keysRegionPrompt(const char* chars, size_t n, bool enter, uint32_t nowMs);
 
   void text(int x, int y, const char* utf8, uint16_t fg, uint16_t bg, size_t maxCells);
   void glyphs(int x, int y, const char* cp437, size_t n, uint16_t fg, uint16_t bg);

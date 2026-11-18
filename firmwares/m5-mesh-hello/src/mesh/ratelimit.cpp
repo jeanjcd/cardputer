@@ -26,3 +26,24 @@ bool ReplyLimiter::allow(uint32_t num, uint32_t nowMs) {
   last_ = nowMs;
   return true;
 }
+
+void AckMemory::record(uint32_t from, uint32_t id) {
+  if (id == 0) return;
+  for (size_t i = 0; i < kSlots; i++)
+    if (from_[i] == from && id_[i] == id) return;  // already recorded: keep its re-ACK count
+  from_[next_] = from;
+  id_[next_] = id;
+  reAcks_[next_] = 0;
+  next_ = (uint8_t)((next_ + 1) % kSlots);
+}
+
+bool AckMemory::allowReAck(uint32_t from, uint32_t id) {
+  if (id == 0) return false;
+  for (size_t i = 0; i < kSlots; i++) {
+    if (from_[i] != from || id_[i] != id) continue;
+    if (reAcks_[i] >= kMaxReAcks) return false;
+    reAcks_[i]++;
+    return true;
+  }
+  return false;
+}

@@ -57,6 +57,10 @@ class App {
   /// Radio and Cap status.
   bool radioReady() const { return radio_.ready(); }
   bool capFound() const { return radio_.capFound(); }
+  /// True on first boot until the user confirms a region: nothing is transmitted meanwhile (RX only).
+  bool regionPrompt() const { return regionPrompt_; }
+  /// True while outgoing frames are held (region unconfirmed or being changed, radio or Cap not working).
+  bool txHeld() const;
   /// Identity load outcome (CreatedNotSaved means the key will change on reboot).
   IdentityStatus idStatus() const { return idStatus_; }
   /// Unread public-channel messages.
@@ -75,6 +79,10 @@ class App {
   void toggleAutoGreet();
   /// Sends text (≤200 B) as a DM to `peer`, or to the public channel for kPublic; false (with a toast) if rejected.
   bool sendText(uint32_t peer, const char* text, uint32_t nowMs);
+  /// First-boot prompt: moves the preselected region by one (dir < 0: previous) and retunes RX; nothing is sent.
+  void stepPromptRegion(int dir, uint32_t nowMs);
+  /// First-boot prompt: confirms the region, saves settings and queues the boot NodeInfo (TX allowed from now on).
+  void confirmPromptRegion(uint32_t nowMs);
   /// Switches to the next supported region, retunes and re-applies the power limit; persisted after 2 s or on flush.
   void cycleRegion(uint32_t nowMs);
   /// Persists a pending (debounced) settings change now, e.g. when leaving the Config tab.
@@ -117,6 +125,8 @@ class App {
   bool enqueue(const uint8_t* frame, size_t len, uint32_t msgId, bool urgent);
   void sendAck(uint32_t to, uint32_t ackedId);
   void sendNodeInfoTo(uint32_t to, bool wantResponse);
+  void serviceHeld(uint32_t nowMs);
+  void retune(uint32_t nowMs);
   void schedule(uint32_t nowMs);
   void transmitOne(uint32_t nowMs);
   void setMsgState(uint32_t msgId, ChatMsg::State from1, ChatMsg::State from2, ChatMsg::State to);
@@ -136,8 +146,7 @@ class App {
   NodeRateLimiter niRequests_;  // direct NodeInfo requests when DMing a node without key
   AirtimeBudget airtime_;
   bool dutyLimited_ = false;
-  uint32_t ackFrom_[8] = {}, ackId_[8] = {};  // DMs we ACKed, to re-ACK their retransmissions
-  uint8_t ackNext_ = 0;
+  AckMemory acked_;  // DMs we ACKed, to re-ACK (at most twice) their retransmissions
 
   TxItem txq_[kTxQueue];
   size_t txHead_ = 0, txCount_ = 0;
@@ -152,7 +161,8 @@ class App {
 
   uint32_t persisted_[NodeDb::kMaxPeers] = {};  // peers already persisted this boot (ring when full)
   size_t persistedCount_ = 0, persistedNext_ = 0;
-  bool settingsDirty_ = false;  // debounced save after region changes
+  bool regionPrompt_ = false;   // first boot: region not confirmed yet, TX off
+  bool settingsDirty_ = false;  // debounced save after region changes (TX held meanwhile)
   uint32_t settingsDirtyMs_ = 0;
 
   uint32_t viewing_ = kNone;
