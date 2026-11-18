@@ -42,7 +42,7 @@ La v0.1.0 es un nodo Meshtastic deliberadamente pequeño. Esta página enumera l
 | **Sin firmas** | XEdDSA no está implementado. Consulta [security.md](security.md#lo-que-no-está-protegido). |
 | **Sin app de teléfono, Wi-Fi, BLE ni MQTT** | El dispositivo solo se configura desde su propio teclado. |
 | **Extracción física de la clave** | El cifrado de la flash está desactivado con M5Launcher, así que la clave privada de la NVS se puede leer con acceso físico. |
-| **Cambio de región perdido en 2 s** | Un cambio de región se guarda 2 s después del último cambio, o al salir de Config. Si apagas antes, se pierde. | No se transmite nada hasta que se guarda.
+| **Cambio de región perdido en 2 s** | Un cambio de región se guarda 2 s después del último cambio, o al salir de Config. Si apagas antes, se pierde. No se transmite nada hasta que se guarda. |
 | **Sin detección automática del Cap en funcionamiento** | Si falta el Cap al arrancar (`SEM CAP LoRa`), hay que reiniciar el firmware después de solucionarlo. |
 | **Regiones experimentales** | IN, NZ_865, NP_865, KZ_863, JP, TW y TH están fuera de la banda nominal de 868–923 MHz del Cap, y su rendimiento no se ha medido. |
 | **Interoperabilidad de extremo a extremo aún no verificada en campo** | La inicialización de la radio, la TX, la persistencia de la identidad y la interfaz están verificadas en el dispositivo. El intercambio de DM y mensajes de canal con otros nodos Meshtastic está implementado y cubierto por pruebas con vectores compatibles con el firmware oficial, pero todavía no se ha confirmado en campo. |

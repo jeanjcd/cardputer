@@ -40,7 +40,7 @@ v0.1.0 is a deliberately small Meshtastic node. This page lists what it does not
 | **No signatures** | XEdDSA is not implemented. See [security.md](security.md#what-is-not-protected). |
 | **No phone app, Wi-Fi, BLE or MQTT** | The device is configured only from its own keyboard. |
 | **Physical key extraction** | Flash encryption is off under M5Launcher, so the private key in NVS is readable with physical access. |
-| **Region change lost within 2 s** | A region change is saved 2 s after the last change, or when leaving Config. Switching off sooner loses it. | Nothing is transmitted until it is saved.
+| **Region change lost within 2 s** | A region change is saved 2 s after the last change, or when leaving Config. Switching off sooner loses it. Nothing is transmitted until it is saved. |
 | **No auto-detection of the Cap at runtime** | If the Cap is missing at boot (`SEM CAP LoRa`), the firmware has to be restarted after fixing it. |
 | **Experimental regions** | IN, NZ_865, NP_865, KZ_863, JP, TW, TH are outside the Cap's rated 868–923 MHz, and their performance is unmeasured. |
 | **End-to-end interoperability not yet field-verified** | Radio init, TX, identity persistence and the UI are verified on the device. Exchanging DMs and channel messages with other Meshtastic nodes is implemented and covered by tests against upstream-compatible vectors, but has not yet been confirmed in the field. |
