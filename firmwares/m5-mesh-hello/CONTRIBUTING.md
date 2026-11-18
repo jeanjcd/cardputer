@@ -139,8 +139,8 @@ cd bin && sha256sum *.bin > SHA256SUMS
 
 ## Translations
 
-Documentation is published in English, Português (Brasil), Español and
-Русский. **English is the source of truth**: change the English document
+Documentation is published in English, Português (Brasil), Español,
+Русский and 日本語. **English is the source of truth**: change the English document
 first, then the translations (or open the PR with English only and say which
 translations need an update). Corrections and new translations are welcome.
 Do not translate code, commands, identifiers, register or field names, or

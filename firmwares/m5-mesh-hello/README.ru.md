@@ -1,4 +1,4 @@
-[English](README.md) | [Português](README.pt-BR.md) | [Español](README.es.md) | **Русский**
+[English](README.md) | [Português](README.pt-BR.md) | [Español](README.es.md) | **Русский** | [日本語](README.ja.md)
 
 > Перевод с английского; в случае расхождений действует [английская версия](README.md).
 

@@ -1,4 +1,4 @@
-**English** | [Português](README.pt-BR.md) | [Español](README.es.md) | [Русский](README.ru.md)
+**English** | [Português](README.pt-BR.md) | [Español](README.es.md) | [Русский](README.ru.md) | [日本語](README.ja.md)
 
 # M5-Mesh-Hello
 
