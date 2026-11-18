@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "../mesh/kv.h"
 #include "../mesh/packet.h"

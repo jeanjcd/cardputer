@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "ratelimit.h"
 
 bool NodeRateLimiter::allow(uint32_t num, uint32_t nowMs, uint32_t periodMs) {

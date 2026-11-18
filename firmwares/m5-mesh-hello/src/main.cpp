@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #ifndef PIO_UNIT_TESTING
 // M5-Mesh-Hello: minimal Meshtastic node for the Cardputer-Adv + Cap LoRa-1262.
 #include <Arduino.h>

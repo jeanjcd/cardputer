@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // AES-CCM on top of rweather AES256. The block layout and processing order
 // mirror Meshtastic's src/mesh/aes-ccm.cpp (itself derived from wpa_supplicant,
 // Copyright (c) 2010-2012 Jouni Malinen, BSD license), restricted to L = 2 and

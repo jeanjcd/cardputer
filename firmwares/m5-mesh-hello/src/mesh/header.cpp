@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "header.h"
 
 static uint32_t rd32(const uint8_t* p) {
