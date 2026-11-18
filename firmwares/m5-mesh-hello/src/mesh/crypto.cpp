@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "aes_ccm.h"
+#include "secure_zero.h"
 
 namespace {
 
@@ -49,7 +50,8 @@ void ctrCrypt(const uint8_t key[16], uint32_t id, uint32_t from, uint8_t* buf, s
   ctr.setCounterSize(4);
   ctr.setIV(iv, sizeof(iv));
   ctr.encrypt(buf, buf, len);
-  ctr.clear();
+  ctr.clear();  // wipes key schedule, counter and keystream
+  secureZero(iv, sizeof(iv));
 }
 
 void x25519Keypair(void (*rng)(uint8_t* buf, size_t len), uint8_t priv[32], uint8_t pub[32]) {
@@ -68,8 +70,10 @@ bool x25519Shared(const uint8_t priv[32], const uint8_t peerPub[32], uint8_t out
     SHA256 sha;
     sha.update(k, 32);
     sha.finalize(outKey, 32);
+    sha.clear();
   }
-  memset(k, 0, sizeof(k));
+  secureZero(k, sizeof(k));  // raw X25519 shared secret
+  secureZero(f, sizeof(f));  // dh2 already wipes f; belt and braces
   return ok;
 }
 

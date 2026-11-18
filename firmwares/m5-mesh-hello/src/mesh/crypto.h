@@ -15,6 +15,6 @@ bool x25519Shared(const uint8_t priv[32], const uint8_t peerPub[32], uint8_t out
 size_t pkiEncrypt(const uint8_t key[32], uint32_t id, uint32_t from, uint32_t extraNonce,
                   const uint8_t* plain, size_t len, uint8_t* out);
 
-/// PKI decrypt of cipher | tag8 | extraNonce LE; returns plain length, or -1 if too short or auth fails.
+/// PKI decrypt of cipher | tag8 | extraNonce LE into out (writes at most wireLen-12 bytes); returns plain length (0 for wireLen 12 with a valid tag), or -1 if wireLen < 12 or auth fails.
 int pkiDecrypt(const uint8_t key[32], uint32_t id, uint32_t from, const uint8_t* wire, size_t wireLen,
                uint8_t* out);

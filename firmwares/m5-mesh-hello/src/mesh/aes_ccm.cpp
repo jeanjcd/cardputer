@@ -7,6 +7,8 @@
 #include <AES.h>
 #include <string.h>
 
+#include "secure_zero.h"
+
 namespace {
 
 constexpr size_t kBlock = 16;
@@ -35,6 +37,7 @@ void cbcMac(AES256& aes, const uint8_t* nonce, size_t M, const uint8_t* msg, siz
     for (size_t i = 0; i < n; i++) x[i] ^= msg[off + i];
     aes.encryptBlock(x, x);
   }
+  secureZero(b, sizeof(b));
 }
 
 // A_i = Flags(L-1) | Nonce | counter i (big endian, 2 bytes).
@@ -54,6 +57,7 @@ void ctrXor(AES256& aes, const uint8_t* nonce, const uint8_t* in, size_t len, ui
     size_t n = len - off < kBlock ? len - off : kBlock;
     for (size_t i = 0; i < n; i++) out[off + i] = in[off + i] ^ s[i];
   }
+  secureZero(s, sizeof(s));
 }
 
 // S_0 = E(K, A_0), used to mask the tag.
@@ -83,6 +87,8 @@ bool aesCcmEncrypt(const uint8_t key[32], const uint8_t nonce[13], size_t M,
   s0(aes, nonce, s);
   for (size_t i = 0; i < M; i++) tag[i] = x[i] ^ s[i];
   aes.clear();
+  secureZero(x, sizeof(x));
+  secureZero(s, sizeof(s));
   return true;
 }
 
@@ -97,8 +103,12 @@ bool aesCcmDecrypt(const uint8_t key[32], const uint8_t nonce[13], size_t M,
   ctrXor(aes, nonce, crypt, len, plain);
   cbcMac(aes, nonce, M, plain, len, x);
   aes.clear();
-  if (ctDiff(x, t, M) != 0) {
-    memset(plain, 0, len);
+  uint8_t diff = ctDiff(x, t, M);
+  secureZero(x, sizeof(x));
+  secureZero(s, sizeof(s));
+  secureZero(t, sizeof(t));
+  if (diff != 0) {
+    secureZero(plain, len);  // never release unauthenticated plaintext
     return false;
   }
   return true;
