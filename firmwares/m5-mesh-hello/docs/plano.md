@@ -212,7 +212,7 @@
 **Interfaces:**
 - Consumes: everything above.
 - Behavior (`App::loop(nowMs)`): poll radio → dedup → parseFrame → NodeDb.touch/applyUser (→ Greeter.onNodeWithKey, Outbox.onKeyArrived) → ChatStore; send ACK for PKI DMs to us with wantAck; if a NodeInfo had wantResponse and was to us or broadcast, reply with our NodeInfo directly (at most once per 12 h per node); boot: broadcast NodeInfo wantResponse=true; every 3 h broadcast NodeInfo; Greeter.due → buildDirectText(greeting) (if key) ; Outbox.next → send; one TX at a time.
-- Settings (Kv): region, power, greeting text.
+- Settings (Kv): region, power, greeting text, **long name (≤24 bytes UTF-8, default "4stro-031") and short name (≤4 chars, default "4S31")** — editable on the Config screen with the keyboard; on change, update Identity and immediately broadcast our NodeInfo (key and node num never change).
 - UI per design: tabs **Nos / Conversa / Canal / Config**; Tab cycles, `;` `.` move, Enter open/send, Esc (`` ` ``) back, `A` toggles auto-greet on Nos; status bar `ANZ 919.875 | AUTO:ON | rx 42 | -97dBm`; node row ≤40 chars at size 1: `4S31 4stro-031  CARDPUTER_ADV  -97 2m ✓●` (use ASCII markers `*`=unread, `+`=greeted). Chat input pre-filled with greeting.
 - `hwModelName(uint32_t)` table for common models incl. 112, 43, 9, 7, 4, 110, 71; chip family string for those (ESP32-S3 / nRF52 / ESP32).
 - [ ] **Step 1:** Implement app/ui/settings.
