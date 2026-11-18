@@ -130,7 +130,7 @@ Tamanhos estáticos aproximados no ESP32-S3 (32 bits):
 | Estrutura | Tamanho | Observações |
 |---|---|---|
 | `ChatStore` | ~21 KB | 96 slots × 224 B (texto de 200 bytes + estado + contato + sequência) |
-| `NodeDb` | ~13 KB | 100 entradas × 128 B + 50 registros de slots persistidos |
+| `NodeDb` | ~15 KB | 100 entradas × 128 B + 50 registros de slots persistidos (as chaves persistidas também ficam fixadas na RAM: 50 × 32 B) |
 | Buffer de linhas da UI | ~9 KB | 210 linhas quebradas × 44 B para desenhar o histórico |
 | `Outbox` | ~2.2 KB | 10 × 216 B |
 | `Greeter` | ~2 KB | 500 IDs cumprimentados + 10 na fila |
@@ -156,7 +156,7 @@ O blob `greeted` (2 KB) é montado na pilha enquanto é carregado ou salvo.
 | Fila de TX | 6 quadros | `App::kTxQueue` |
 | Conjunto de cumprimentados / fila de saudação | 500 / 10 | `Greeter` |
 | Cache de duplicatas | 64 pares | `DedupCache` |
-| Memória de reconfirmação (re-ACK) | 8 DMs | `App::ackFrom_` |
+| Memória de reconfirmação (re-ACK) | 8 DMs, no máximo 2 re-ACKs cada | `AckMemory` |
 | Intervalo entre os nossos quadros | 1.5 s | `kTxGapMs` |
 | Intervalo da saudação automática | 30 s | `Greeter` |
 | Período do NodeInfo | 3 h | `kNodeInfoPeriodMs` |

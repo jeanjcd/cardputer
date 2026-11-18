@@ -143,7 +143,7 @@ Um `User` recebido cujo `public_key` esteja presente mas não tenha exatamente 3
 
 ## Tratamento de chave desconhecida
 
-- **Envio para um nó sem chave**: a DM fica retida (estado `?`) e enviamos o nosso NodeInfo **diretamente** para aquele nó com `want_response = 1` (no máximo uma vez a cada 60 s por nó). Quando o NodeInfo dele com a chave chega, as DMs retidas são liberadas.
+- **Envio para um nó sem chave**: a DM fica retida (estado `?`) e enviamos o nosso NodeInfo **diretamente** para aquele nó com `want_response = 1` (no máximo uma vez a cada 60 s por nó). Quando o NodeInfo dele com a chave chega, as DMs retidas são liberadas. O pedido é repetido no máximo uma vez a cada 60 s enquanto houver DMs retidas; uma DM retida falha (`x`) depois de 10 minutos, ou antes, se a fila de 10 DMs estiver cheia e uma DM para um nó com chave precisar da vaga.
 - **Recepção de uma DM PKI de um nó sem chave**: enviamos um NAK `Routing{error_reason = 35 (PKI_UNKNOWN_PUBKEY)}` com `request_id` = o ID do pacote dele, mais o nosso NodeInfo com `want_response = 1`. Limites: uma vez a cada 10 minutos por nó e uma vez a cada 30 s no total. Quadros não decodificáveis **não** entram no cache de duplicatas, para que a nova tentativa do remetente possa ser decifrada quando a chave tiver chegado.
 
 ## NodeInfo

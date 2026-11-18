@@ -27,16 +27,16 @@ Conteúdo:
 
 ## Antes de começar
 
-1. **Rosqueie a antena no Cap antes de ligar.** O firmware transmite um anúncio NodeInfo menos de um segundo após a inicialização. Transmitir sem antena pode danificar o rádio.
+1. **Rosqueie a antena no Cap antes de ligar.** O firmware transmite um anúncio NodeInfo menos de um segundo após a inicialização (na primeiríssima inicialização, logo depois de você confirmar a região). Transmitir sem antena pode danificar o rádio.
 2. Instale o firmware com o M5Launcher (veja o [início rápido do README](../../README.pt-BR.md#início-rápido) e [hardware.md](hardware.md#instalação-com-o-m5launcher)).
 3. Descubra qual região os usuários Meshtastic perto de você usam. No Brasil, a comunidade usa **ANZ** (o padrão). Veja [frequencies.md](frequencies.md).
 
 ## Primeira inicialização
 
-- Na primeiríssima inicialização, o aparelho gera um par de chaves X25519 a partir do gerador de números aleatórios do hardware e o grava na flash (NVS). O par de chaves **nunca muda** depois disso. Os nós Meshtastic guardam a primeira chave pública que ouvem de cada nó ("a primeira chave vence"), então uma chave nova faria com que eles parassem de conseguir enviar mensagens diretas para você.
+- Na primeiríssima inicialização, o aparelho gera um par de chaves X25519 a partir do gerador de números aleatórios do hardware, o grava na flash (NVS) e mostra o aviso `Nova chave gerada`. O par de chaves é mantido entre reinicializações e atualizações. Ele só muda se a NVS do aparelho for apagada, por exemplo por um apagamento completo da flash ou por alguns apps instalados pelo M5Launcher que limpam a NVS compartilhada. Os nós Meshtastic guardam a primeira chave pública que ouvem de cada nó ("a primeira chave vence"), então, depois de uma troca de chave, outros nós podem rejeitar a chave nova, e deixar de trocar mensagens diretas com você, até esquecerem a antiga.
 - O seu **ID de nó** (`!xxxxxxxx`) vem do endereço MAC de fábrica do chip e também é permanente.
 - Os nomes padrão são **4stro-031** (longo) e **4S31** (curto). Você pode mudá-los na tela Config.
-- O aparelho inicia na região salva da última vez (ANZ numa instalação nova), difunde seu NodeInfo pedindo aos vizinhos que enviem os deles e então fica escutando.
+- **Na primeiríssima inicialização nada é transmitido até você escolher a região.** A tela mostra `Primeiro uso: escolha a sua região` com ANZ pré-selecionada: `;` / `.` mudam a região e `Enter` confirma. Enquanto isso, o rádio só escuta. Depois da confirmação, a região é salva e o aparelho difunde seu NodeInfo pedindo aos vizinhos que enviem os deles, e então fica escutando. As inicializações seguintes já começam na região salva. Se as configurações salvas estiverem danificadas mas a região delas ainda for válida, essa região é mantida (as outras configurações voltam ao padrão); se não houver região válida guardada, a pergunta aparece de novo.
 - **A saudação automática fica DESLIGADA** após toda inicialização.
 
 ## Layout da tela
@@ -156,7 +156,7 @@ Seis itens. Selecione um com `;`/`.` e pressione `Enter`. A linha de dica mostra
 
 ### Região
 
-Mostra o nome da região e a frequência LongFast, por exemplo `ANZ 919.875`. Cada `Enter` avança para a próxima região na ordem da [tabela de regiões](frequencies.md#regiões-suportadas) e **ressintoniza o rádio na hora**. Também reaplica o limite de potência da região. A nova região é salva 2 segundos após a última mudança, ou quando você sai da tela Config (aviso `Config salva`). Se você desligar o aparelho dentro desses 2 segundos, a mudança se perde.
+Mostra o nome da região e a frequência LongFast, por exemplo `ANZ 919.875`. Cada `Enter` avança para a próxima região na ordem da [tabela de regiões](frequencies.md#regiões-suportadas) e **ressintoniza o rádio na hora**. Também reaplica o limite de potência da região. A nova região é salva 2 segundos após a última mudança, ou quando você sai da tela Config (aviso `Config salva`). Se você desligar o aparelho dentro desses 2 segundos, a mudança se perde. Até a nova região ser salva, nada é transmitido: os quadros na fila esperam, então nada sai numa região pela qual você está só passando.
 
 - Regiões experimentais mostram `(exp)`, por exemplo `IN 865.875 (exp)`. Ao selecionar uma delas, aparece o aviso `Fora da faixa do Cap (exp)`. Enquanto uma estiver selecionada, a tela mostra o alerta `! Fora de 868-923 MHz do Cap (exp)`. Essas frequências ficam fora da faixa nominal do Cap, então o alcance pode ser menor. Use uma delas só se for a região do seu país.
 - Nas regiões com limite de ciclo de trabalho (EU_868, UA_868, TH), uma linha extra mostra o tempo no ar usado na última hora: `Ar 1h: 12s de 360s (duty 10%)`.
@@ -226,8 +226,8 @@ As suas mensagens começam com um marcador de estado seguido de `>`. As recebida
 | `~` | na fila | Esperando na fila de transmissão (ou pelo orçamento de duty cycle) |
 | `.` | enviada | O rádio a transmitiu. Para uma DM, a confirmação (ainda) não chegou. Mensagens do canal público ficam em `.` porque o canal não tem confirmações. |
 | `v` | confirmada | O ACK do destinatário voltou: a DM foi entregue e decifrada |
-| `?` | esperando chave | A chave pública do destinatário é desconhecida. A DM fica retida até a chave chegar (veja abaixo). |
-| `x` | falhou | A transmissão falhou (`Falha no TX`: o rádio informou um erro durante o envio, ou não estava pronto), o destinatário respondeu com erro (NAK) ou a chave estava ausente no momento do envio |
+| `?` | esperando chave | A chave pública do destinatário é desconhecida. A DM fica retida até a chave chegar, por no máximo 10 minutos (veja abaixo). |
+| `x` | falhou | A transmissão falhou (`Falha no TX`: o rádio informou um erro durante o envio), o destinatário respondeu com erro (NAK), a chave estava ausente no momento do envio ou a chave não chegou em 10 minutos |
 
 **O estado `?`.** Uma DM só pode ser criptografada com a chave pública do destinatário, que chega no NodeInfo dele. Quando você envia para um nó sem chave:
 
@@ -235,7 +235,7 @@ As suas mensagens começam com um marcador de estado seguido de `>`. As recebida
 2. O aparelho envia **o seu próprio NodeInfo diretamente para aquele nó, pedindo o NodeInfo dele em troca** (no máximo uma vez por minuto por nó).
 3. Quando o NodeInfo do nó chega, todas as mensagens `?` para ele mudam para `~` e são enviadas.
 
-Se o nó estiver fora de alcance ou não responder, a mensagem fica em `?`. Reenviar ou pressionar `Enviar NodeInfo` pode ajudar quando o nó estiver alcançável.
+Enquanto a mensagem está em `?`, o aparelho repete o pedido de NodeInfo para aquele nó no máximo uma vez por minuto. Se nenhuma chave chegar em **10 minutos**, a mensagem passa para `x`. Ela também passa para `x` quando a fila de 10 DMs está cheia e você envia uma DM para um nó cuja chave é conhecida: a mensagem `?` mais antiga cede o lugar. Reenviar ou pressionar `Enviar NodeInfo` pode ajudar quando o nó estiver alcançável.
 
 **Sem reenvio automático.** Se uma DM fica em `.` (sem ACK), o firmware não a envia de novo. Digite novamente se precisar.
 
@@ -254,7 +254,7 @@ Ele transmite somente nestes casos:
 | Você envia uma mensagem | Texto público (Canal) ou DM criptografada com want_ack (Conversa) | Quando você pressiona Enter |
 | Você envia uma DM para um nó sem chave | NodeInfo enviado diretamente para aquele nó com want_response | No máximo uma vez por minuto por nó |
 | A saudação automática está LIGADA | DM de saudação para um nó que acabou de ter a chave conhecida | Uma a cada 30 s, uma única vez por nó |
-| Você recebe uma DM que pede ACK | ACK para o remetente (e de novo se o remetente retransmitir a mesma DM) | Uma vez por DM recebida |
+| Você recebe uma DM que pede ACK | ACK para o remetente (e de novo se o remetente retransmitir a mesma DM) | Uma vez por DM recebida, mais no máximo 2 repetições para as retransmissões dela |
 | Um nó pede o nosso NodeInfo (want_response) | NodeInfo para aquele nó | No máximo uma vez a cada 30 s no total **e** uma vez a cada 12 h por nó |
 | Um nó nos envia uma DM criptografada mas não temos a chave dele | NAK (`PKI_UNKNOWN_PUBKEY`) mais o nosso NodeInfo com want_response, para que a próxima tentativa dele possa ser decifrada | No máximo uma vez a cada 30 s no total e uma vez a cada 10 min por nó |
 
@@ -292,7 +292,7 @@ Um nó aparece na lista assim que qualquer quadro decodificável dele é ouvido:
 | `duty limit` (vermelho) | O orçamento de tempo no ar da região na última hora se esgotou, e há quadros esperando | Nada se perde. Os quadros saem conforme o orçamento libera, dentro da hora. A Config mostra `Ar 1h: ...`. Só EU_868, UA_868 e TH têm orçamento. |
 | `-dBm` | Nenhum quadro recebido desde a inicialização | Veja [Por que nenhum nó aparece](#por-que-nenhum-nó-aparece). |
 
-Quando o rádio não está funcionando, as tentativas de transmitir também geram o aviso `Falha no TX` (o rádio não está pronto).
+Quando o rádio não está funcionando (`SEM CAP LoRa` ou `RADIO ERRO`), nada é transmitido: os quadros esperam na fila (as suas mensagens ficam em `~`) e não são marcados como falha.
 
 ### Avisos (amarelos, 2.5 s)
 
@@ -301,12 +301,13 @@ Quando o rádio não está funcionando, as tentativas de transmitir também gera
 | `Config salva` | Configurações gravadas na flash | Nada. |
 | `ERRO ao gravar config` | A gravação na flash falhou | A configuração vale até reiniciar, mas pode se perder. Tente de novo. Se continuar falhando, a partição NVS pode estar cheia ou danificada. |
 | `ERRO: chave nao gravada!` (na inicialização) | Um novo par de chaves foi gerado, mas não pôde ser guardado | A chave vai mudar na próxima inicialização, e os nós que guardaram a chave antiga vão rejeitar a nova. Verifique a flash/NVS (reinstale). Também aparece na Config como `ERRO: chave não gravada na NVS!`. |
+| `Nova chave gerada` (na inicialização) | Não havia par de chaves guardado (primeira inicialização, ou a NVS foi apagada), então um novo foi criado e gravado | Nada, na primeira inicialização. Se aparecer depois, a NVS foi apagada: os nós que guardaram a sua chave antiga podem rejeitar a nova até esquecê-la. |
 | `ERRO no radio` | Erro do rádio ao mudar a região ou a potência | Desligue e ligue. O rádio pode não estar na frequência exibida. |
 | `Fora da faixa do Cap (exp)` | Você selecionou uma região experimental | Tudo bem se for a região do seu país. Espere alcance reduzido. |
-| `Falha no TX` | O rádio informou um erro durante o envio, ou o rádio não está pronto (por exemplo, Cap não detectado) | A mensagem é marcada com `x`. Veja se a barra de status mostra `SEM CAP LoRa` / `RADIO ERRO` e desligue e ligue o aparelho. |
+| `Falha no TX` | O rádio informou um erro durante o envio | A mensagem é marcada com `x`. Envie de novo. Se continuar acontecendo, desligue e ligue o aparelho. |
 | `Texto longo demais` | Mais de 199 bytes | Encurte a mensagem. A entrada pelo teclado já para em 199 bytes. |
 | `Fila de TX cheia` | 6 quadros esperando ao enviar para o canal | Espere alguns segundos e envie de novo. Nas regiões com duty cycle, o orçamento pode estar segurando quadros. |
-| `Fila de mensagens cheia` | Já há 10 DMs esperando (por exemplo, várias mensagens `?`) | Espere as chaves chegarem ou as mensagens saírem. A DM não foi guardada. |
+| `Fila de mensagens cheia` | Já há 10 DMs esperando (por exemplo, várias mensagens `?`) | Espere as chaves chegarem ou as mensagens saírem. Mensagens `?` desistem depois de 10 minutos, e uma DM para um nó com chave conhecida substitui a mensagem `?` mais antiga. A DM não foi guardada. |
 | `Aguardando chave do no` | DM guardada com `?`, pedido de NodeInfo enviado | Espere o NodeInfo do nó. Veja [o estado `?`](#marcadores-de-mensagem). |
 | `NodeInfo em Ns` | Uma difusão de NodeInfo foi pedida menos de 30 s depois da anterior; sai em N segundos | Nada. Sai automaticamente. |
 | `Potência: 2 a 22 dBm` | Valor inválido | Digite um número de 2 a 22. |
@@ -321,6 +322,7 @@ Quando o rádio não está funcionando, as tentativas de transmitir também gera
 | Uma DM fica em `?` | A chave do nó não chegou. Veja [o estado `?`](#marcadores-de-mensagem). |
 | Uma DM fica em `.` | Foi transmitida, mas nenhum ACK voltou. O destinatário pode estar fora de alcance, ou o ACK se perdeu. Não há reenvio automático. |
 | Uma DM mostra `x` logo depois de `?` virar `~` | A chave do nó sumiu antes do envio (por exemplo, o nó foi removido de uma lista cheia). Envie de novo. |
+| Um contato salvo reiniciou o aparelho de fábrica e as DMs pararam de funcionar | Este aparelho mantém a primeira chave que salvou para aquele contato e ignora a nova. Veja as [Perguntas frequentes](#perguntas-frequentes). |
 | Nó cinza sem nome | Quadros dele foram ouvidos, mas o NodeInfo não. Espere, ou abra uma conversa e envie uma DM: isso pede o NodeInfo dele. |
 | O cabeçalho mostra `(fora da lista)` | Aquele nó foi removido da lista de 100 nós. As mensagens dele continuam até serem empurradas para fora. |
 | Teclas ignoradas por um instante | Um quadro está sendo transmitido (por até cerca de 2.2 s). |
@@ -385,3 +387,7 @@ Não. Ele é um nó `CLIENT_MUTE` e nunca redifunde pacotes de outros nós.
 
 **Por que a saudação mostra um `?` na tela?**
 O emoji 👋 não tem glifo na fonte da tela. Ele é enviado corretamente. Veja [Limitações da tela](#limitações-da-tela).
+
+**Um contato reiniciou o aparelho (chave nova) e as nossas DMs pararam de funcionar. O que fazer?**
+
+Este firmware mantém a primeira chave pública que salvou para cada contato de DM (até 50) e ignora qualquer outra chave para aquele número de nó, mesmo depois de o contato sair da lista de 100 nós. Isso protege contra falsificação, mas também significa que, se o contato restaurar o aparelho de fábrica ou apagar a NVS e ganhar uma chave nova, este aparelho continua a rejeitá-la: ele não consegue decifrar as suas DMs, e você não consegue decifrar as dele. A v1 não tem uma ação para esquecer uma chave salva (uma ação "esquecer chave do nó" está no [roadmap](roadmap.md)). Hoje, a única saída é apagar a NVS deste aparelho, o que também troca a sua própria chave e apaga os contatos salvos, a lista de saudados e as configurações.

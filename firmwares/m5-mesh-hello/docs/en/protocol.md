@@ -141,7 +141,7 @@ A received `User` whose `public_key` is present but not exactly 32 bytes is reje
 
 ## Unknown-key handling
 
-- **Sending to a node without a key**: the DM is held (state `?`), and we send our NodeInfo **directly** to that node with `want_response = 1` (at most once per 60 s per node). When its NodeInfo with a key arrives, held DMs are released.
+- **Sending to a node without a key**: the DM is held (state `?`), and we send our NodeInfo **directly** to that node with `want_response = 1` (at most once per 60 s per node). When its NodeInfo with a key arrives, held DMs are released. The request is repeated at most once per 60 s while DMs are held; a held DM fails (`x`) after 10 minutes, or earlier if the 10-DM outbox is full and a DM to a keyed node needs the slot.
 - **Receiving a PKI DM from a node without a key**: we send a NAK `Routing{error_reason = 35 (PKI_UNKNOWN_PUBKEY)}` with `request_id` = its packet ID, plus our NodeInfo with `want_response = 1`. Limits: once per 10 minutes per node and once per 30 s globally. Undecodable frames are **not** added to the duplicate cache, so the sender's retry can be decrypted once the key has arrived.
 
 ## NodeInfo

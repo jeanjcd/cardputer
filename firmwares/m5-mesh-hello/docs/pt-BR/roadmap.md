@@ -21,6 +21,7 @@ A v0.1.0 é um nó Meshtastic deliberadamente pequeno. Esta página lista o que 
 | **Indicador de bateria** | Ler o ADC da bateria, que a v1 não usa. Exige cuidado: a fonte de entropia de RF usada na geração de chaves compartilha hardware com o ADC, então o ADC precisa ser configurado depois da geração de chaves. |
 | **MeshCore?** | Suporte ao protocolo MeshCore como malha alternativa. A explorar. |
 | **Migração de identidade** | Uma migração versionada do registro da chave, para que uma futura mudança de formato nunca gere uma chave nova. |
+| **Esquecer chave do nó** | Uma ação para esquecer a chave de um contato salvo, para que um contato que restaurou o aparelho de fábrica (chave nova) possa ser aceito de novo. Hoje uma chave salva nunca pode ser substituída. |
 
 ## Limitações conhecidas da v1
 
@@ -34,13 +35,14 @@ A v0.1.0 é um nó Meshtastic deliberadamente pequeno. Esta página lista o que 
 | **Rolagem nas telas de texto** | O histórico rola com `Fn`+`;` / `Fn`+`.`, uma linha por toque. |
 | **Sem reenvio de DM** | Uma DM sem ACK fica em `.`. |
 | **Mensagens só na RAM** | 30 por conversa, 96 no total, perdidas ao desligar. |
-| **100 nós na RAM** | O nó ouvido há mais tempo é descartado. A chave de um nó descartado só é mantida se ele for um contato de DM salvo (até 50). |
+| **100 nós na RAM** | Quando a lista está cheia, sai primeiro o nó sem chave, ouvido há mais tempo, que não é contato salvo; senão, o nó ouvido há mais tempo. As chaves dos contatos de DM salvos (até 50) ficam numa tabela separada, então sobrevivem à saída da lista. |
+| **Chaves de contatos salvos não podem ser substituídas** | Se um contato salvo restaurar o aparelho de fábrica e ganhar uma chave nova, ela é rejeitada e as DMs com ele param de funcionar. Ainda não há a ação "esquecer chave do nó". Veja as [Perguntas frequentes do guia do usuário](user-guide.md#perguntas-frequentes). |
 | **Conjunto de 500 cumprimentados** | Depois de 500 nós cumprimentados, a saudação automática para de cumprimentar nós novos, para que ninguém seja cumprimentado duas vezes. |
 | **Um só canal e preset** | Só o canal primário padrão, só LongFast. |
 | **Sem assinaturas** | O XEdDSA não está implementado. Veja [security.md](security.md#o-que-não-é-protegido). |
 | **Sem app de celular, Wi-Fi, BLE ou MQTT** | O aparelho é configurado só pelo próprio teclado. |
 | **Extração física da chave** | A criptografia da flash fica desligada sob o M5Launcher, então a chave privada na NVS pode ser lida com acesso físico. |
-| **Mudança de região perdida em 2 s** | Uma mudança de região é salva 2 s depois da última mudança, ou ao sair da Config. Desligar antes disso a perde. |
+| **Mudança de região perdida em 2 s** | Uma mudança de região é salva 2 s depois da última mudança, ou ao sair da Config. Desligar antes disso a perde. | Nada é transmitido até ela ser salva.
 | **Sem detecção automática do Cap em funcionamento** | Se o Cap estiver ausente na inicialização (`SEM CAP LoRa`), é preciso reiniciar o firmware depois de corrigir. |
 | **Regiões experimentais** | IN, NZ_865, NP_865, KZ_863, JP, TW e TH ficam fora da faixa nominal de 868–923 MHz do Cap, e o desempenho delas não foi medido. |
 | **Interoperabilidade de ponta a ponta ainda não verificada em campo** | Inicialização do rádio, TX, persistência da identidade e a interface foram verificados no aparelho. A troca de DMs e mensagens de canal com outros nós Meshtastic está implementada e coberta por testes contra vetores compatíveis com o firmware oficial, mas ainda não foi confirmada em campo. |

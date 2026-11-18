@@ -21,6 +21,7 @@ La v0.1.0 es un nodo Meshtastic deliberadamente pequeño. Esta página enumera l
 | **Indicador de batería** | Leer el ADC de la batería, que la v1 no usa. Requiere cuidado: la fuente de entropía de RF usada para generar claves comparte hardware con el ADC, así que el ADC debe configurarse después de generar las claves. |
 | **¿MeshCore?** | Compatibilidad con el protocolo MeshCore como malla alternativa. Por explorar. |
 | **Migración de identidad** | Una migración versionada del registro de la clave, para que un futuro cambio de formato nunca regenere la clave. |
+| **Olvidar la clave de un nodo** | Una acción para olvidar la clave de un contacto guardado, de modo que un contacto que restableció su dispositivo (clave nueva) pueda aceptarse de nuevo. Hoy una clave guardada nunca se puede sustituir. |
 
 ## Limitaciones conocidas de v1
 
@@ -34,13 +35,14 @@ La v0.1.0 es un nodo Meshtastic deliberadamente pequeño. Esta página enumera l
 | **Desplazamiento en las pantallas de texto** | El historial se desplaza con `Fn`+`;` / `Fn`+`.`, una línea por pulsación. |
 | **Sin reintento de DM** | Un DM sin ACK se queda en `.`. |
 | **Mensajes solo en RAM** | 30 por conversación, 96 en total, se pierden al apagar. |
-| **100 nodos en RAM** | Se descarta el nodo oído hace más tiempo. La clave de un nodo descartado solo se conserva si es un contacto de DM guardado (hasta 50). |
+| **100 nodos en RAM** | Cuando la lista está llena, primero se descarta el nodo sin clave oído hace más tiempo que no sea un contacto guardado; si no lo hay, el nodo oído hace más tiempo. Las claves de los contactos de DM guardados (hasta 50) se mantienen en una tabla aparte, así que sobreviven a la salida de la lista. |
+| **Las claves de contactos guardados no se pueden sustituir** | Si un contacto guardado restablece su dispositivo y obtiene una clave nueva, se rechaza y los DM con él dejan de funcionar. Todavía no hay una acción "olvidar la clave del nodo". Consulta las [preguntas frecuentes de la guía](user-guide.md#preguntas-frecuentes). |
 | **Conjunto de 500 saludados** | Tras 500 nodos saludados, el saludo automático deja de saludar a nodos nuevos, para que nadie reciba dos saludos. |
 | **Un solo canal y preset** | Solo el canal primario por defecto, solo LongFast. |
 | **Sin firmas** | XEdDSA no está implementado. Consulta [security.md](security.md#lo-que-no-está-protegido). |
 | **Sin app de teléfono, Wi-Fi, BLE ni MQTT** | El dispositivo solo se configura desde su propio teclado. |
 | **Extracción física de la clave** | El cifrado de la flash está desactivado con M5Launcher, así que la clave privada de la NVS se puede leer con acceso físico. |
-| **Cambio de región perdido en 2 s** | Un cambio de región se guarda 2 s después del último cambio, o al salir de Config. Si apagas antes, se pierde. |
+| **Cambio de región perdido en 2 s** | Un cambio de región se guarda 2 s después del último cambio, o al salir de Config. Si apagas antes, se pierde. | No se transmite nada hasta que se guarda.
 | **Sin detección automática del Cap en funcionamiento** | Si falta el Cap al arrancar (`SEM CAP LoRa`), hay que reiniciar el firmware después de solucionarlo. |
 | **Regiones experimentales** | IN, NZ_865, NP_865, KZ_863, JP, TW y TH están fuera de la banda nominal de 868–923 MHz del Cap, y su rendimiento no se ha medido. |
 | **Interoperabilidad de extremo a extremo aún no verificada en campo** | La inicialización de la radio, la TX, la persistencia de la identidad y la interfaz están verificadas en el dispositivo. El intercambio de DM y mensajes de canal con otros nodos Meshtastic está implementado y cubierto por pruebas con vectores compatibles con el firmware oficial, pero todavía no se ha confirmado en campo. |

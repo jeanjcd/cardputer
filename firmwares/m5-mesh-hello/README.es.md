@@ -18,7 +18,7 @@ La interfaz en pantalla está en portugués. La documentación cita los textos t
 - Chat en el **canal público**.
 - **Saludo automático**: desactivado en cada arranque. Cuando está activo, envía tu saludo una sola vez por nodo, para siempre (lista persistente), como máximo uno cada 30 s.
 - **18 regiones** (11 dentro de la banda nominal del Cap y 7 experimentales), con la potencia de TX limitada al máximo de cada región y un presupuesto horario de tiempo en el aire en las regiones con ciclo de trabajo (duty cycle).
-- Nombre largo/corto, texto del saludo y potencia de TX editables. El par de claves se genera una sola vez a partir de la entropía del hardware y nunca cambia.
+- Nombre largo/corto, texto del saludo y potencia de TX editables. El par de claves se genera una sola vez a partir de la entropía del hardware y se guarda en la NVS (solo cambia si se borra la NVS).
 - Nunca retransmite el tráfico de otros nodos (`CLIENT_MUTE`). El Wi-Fi y el Bluetooth permanecen apagados.
 - Núcleo de protocolo portable con pruebas unitarias nativas, una prueba de fuzzing, ASan/UBSan y CodeQL en la CI.
 
@@ -72,8 +72,8 @@ Detalles: [docs/es/hardware.md](docs/es/hardware.md).
    ```
 2. Copia `bin/M5-Mesh-Hello.bin` a la tarjeta microSD e instálalo con **M5Launcher**. Si hay una versión anterior instalada, elimínala primero (**PMan → Remove**).
    (`bin/M5-Mesh-Hello-merged.bin` es una imagen completa de la flash para esptool en la dirección `0x0`. Grabarla **borra M5Launcher y todas las aplicaciones instaladas con él**. Úsala solo si no usas M5Launcher.)
-3. Conecta la antena e inicia la aplicación. En el primer arranque crea su par de claves, se anuncia y empieza a escuchar.
-4. En la pantalla **Config**, comprueba la **región** (`Região`): todos los nodos deben usar la misma. La región por defecto es ANZ (919.875 MHz).
+3. Conecta la antena e inicia la aplicación. En el primer arranque crea su par de claves y te pide la **región** (ANZ preseleccionada; `;` / `.` para cambiarla, `Enter` para confirmar). **No se transmite nada hasta que confirmes.** Después se anuncia y empieza a escuchar.
+4. Puedes cambiar la región más tarde en la pantalla **Config** (`Região`): todos los nodos deben usar la misma, y debes usar la que es legal en tu país.
 5. Espera a que aparezcan nodos en la pantalla **Nós**, selecciona uno, pulsa `Enter` y envía el saludo ya escrito. O pulsa `A` para activar el saludo automático.
 
 ## Regiones

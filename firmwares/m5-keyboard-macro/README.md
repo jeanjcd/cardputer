@@ -9,7 +9,7 @@ Com a macro ligada, a cada 60 s:
 ## Uso
 
 1. Instale `bin/M5-Keyboard-Macro.bin` pelo **M5Launcher**: copie para o SD e abra **SD → instalar**.
-   Se o Launcher recusar, use `bin/M5-Keyboard-Macro-merged.bin`, que é a imagem completa para gravar em `0x0`.
+   `bin/M5-Keyboard-Macro-merged.bin` é a imagem completa para gravar com esptool em `0x0`. **Gravá-la apaga o M5Launcher e todos os apps instalados por ele.** Use-a só se você não usa o M5Launcher.
 2. No PC, pareie o dispositivo **M5-Keyboard** (Windows, macOS ou Linux).
 3. **Enter** no Cardputer liga e desliga a macro. A tela mostra o status do Bluetooth, se a macro está ON/OFF, quanto falta para o próximo ciclo e quantos ciclos já rodaram.
 

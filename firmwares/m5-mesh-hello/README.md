@@ -14,7 +14,7 @@ This is not the official Meshtastic firmware. It is a minimal implementation wri
 - **Public channel** chat.
 - **Auto-greet**: off at every boot. When on, it sends your greeting once per node, ever (persisted list), at most one every 30 s.
 - **18 regions** (11 within the Cap's rated band plus 7 experimental), with the TX power clamped to each region's limit and an hourly airtime budget for duty-cycle regions.
-- Editable long/short name, greeting text and TX power. The key pair is generated once from hardware entropy and never changes.
+- Editable long/short name, greeting text and TX power. The key pair is generated once from hardware entropy and kept in NVS (it changes only if the NVS is erased).
 - Never relays other nodes' traffic (`CLIENT_MUTE`). Wi-Fi and Bluetooth stay off.
 - Portable protocol core with native unit tests, a fuzz test, ASan/UBSan and CodeQL in CI.
 
@@ -68,8 +68,8 @@ Details: [docs/en/hardware.md](docs/en/hardware.md).
    ```
 2. Copy `bin/M5-Mesh-Hello.bin` to the microSD card and install it with **M5Launcher**. If an older version is installed, remove it first (**PMan → Remove**).
    (`bin/M5-Mesh-Hello-merged.bin` is a full-flash image for esptool at `0x0`. Flashing it **erases M5Launcher and every app installed through it**. Use it only if you do not use M5Launcher.)
-3. Attach the antenna and start the app. On first boot it creates its key pair, announces itself and starts listening.
-4. On **Config**, check the **region** (`Região`): every node must use the same one. The default is ANZ (919.875 MHz).
+3. Attach the antenna and start the app. On first boot it creates its key pair and asks for your **region** (ANZ preselected; `;` / `.` to change, `Enter` to confirm). **Nothing is transmitted until you confirm.** Then it announces itself and starts listening.
+4. You can change the region later on **Config** (`Região`): every node must use the same one, and you must use the one legal in your country.
 5. Wait for nodes to appear on **Nós**, select one, press `Enter` and send the pre-filled greeting. Or press `A` to turn on auto-greet.
 
 ## Regions

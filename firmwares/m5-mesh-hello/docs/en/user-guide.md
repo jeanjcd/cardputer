@@ -25,16 +25,16 @@ Contents:
 
 ## Before you start
 
-1. **Screw the antenna onto the Cap before powering on.** The firmware transmits a NodeInfo announcement within a second of booting. Transmitting without an antenna can damage the radio.
+1. **Screw the antenna onto the Cap before powering on.** The firmware transmits a NodeInfo announcement within a second of booting (on the very first boot, right after you confirm the region). Transmitting without an antenna can damage the radio.
 2. Install the firmware with M5Launcher (see the [README quick start](../../README.md#quick-start) and [hardware.md](hardware.md#installing-with-m5launcher)).
 3. Know which region the Meshtastic users near you use. In Brazil the community uses **ANZ** (the default). See [frequencies.md](frequencies.md).
 
 ## First boot
 
-- On the very first boot the device generates an X25519 key pair from the hardware random number generator and stores it in flash (NVS). The key pair **never changes** afterwards. Meshtastic nodes remember the first public key they hear for each node ("first key wins"), so a new key would stop them from sending you direct messages.
+- On the very first boot the device generates an X25519 key pair from the hardware random number generator and stores it in flash (NVS), and shows the toast `Nova chave gerada` ("new key generated"). The key pair is kept across reboots and updates. It changes only if the device's NVS is erased, for example by a full flash erase or by some apps installed through M5Launcher that wipe the shared NVS. Meshtastic nodes remember the first public key they hear for each node ("first key wins"), so after a key change other nodes may reject the new key, and stop exchanging direct messages with you, until they forget the old one.
 - Your **node ID** (`!xxxxxxxx`) comes from the chip's factory MAC address and is also permanent.
 - The default names are **4stro-031** (long) and **4S31** (short). You can change them on the Config screen.
-- The device starts in the region saved last time (ANZ on a fresh install), broadcasts its NodeInfo asking neighbours for theirs, and then listens.
+- **On the very first boot nothing is transmitted until you choose the region.** The screen shows `Primeiro uso: escolha a sua região` ("first use: choose your region") with ANZ preselected: `;` / `.` change the region and `Enter` confirms. Meanwhile the radio only listens. After you confirm, the region is saved and the device broadcasts its NodeInfo asking neighbours for theirs, then listens. Later boots start directly in the saved region. If the saved settings are damaged but their region is still valid, that region is kept (other settings return to defaults); if no valid region is stored, the prompt appears again.
 - **Auto-greet is OFF** after every boot.
 
 ## The screen layout
@@ -154,7 +154,7 @@ Six items. Select one with `;`/`.` and press `Enter`. The hint line reads `Enter
 
 ### Região (Region)
 
-Shows the region name and the LongFast frequency, for example `ANZ 919.875`. Each `Enter` moves to the next region in the order of the [region table](frequencies.md#supported-regions) and **retunes the radio immediately**. It also re-applies the region's power limit. The new region is saved 2 seconds after the last change, or when you leave the Config screen (toast `Config salva`). If you switch off within those 2 seconds, the change is lost.
+Shows the region name and the LongFast frequency, for example `ANZ 919.875`. Each `Enter` moves to the next region in the order of the [region table](frequencies.md#supported-regions) and **retunes the radio immediately**. It also re-applies the region's power limit. The new region is saved 2 seconds after the last change, or when you leave the Config screen (toast `Config salva`). If you switch off within those 2 seconds, the change is lost. Until the new region is saved, nothing is transmitted: queued frames wait, so nothing goes out on a region you are only passing through.
 
 - Experimental regions show `(exp)`, for example `IN 865.875 (exp)`. When you select one, the toast `Fora da faixa do Cap (exp)` ("outside the Cap's band (experimental)") appears. While one is selected, the screen shows the warning `! Fora de 868-923 MHz do Cap (exp)` ("outside the Cap's 868–923 MHz"). These frequencies are outside the Cap's rated band, so range may be worse. Use one only if it is your country's region.
 - In regions with a duty-cycle limit (EU_868, UA_868, TH), an extra line shows the airtime used in the last hour: `Ar 1h: 12s de 360s (duty 10%)` ("airtime 1 h: 12 s of 360 s").
@@ -224,8 +224,8 @@ Your own messages start with a state marker followed by `>`. Received messages s
 | `~` | queued | Waiting in the transmit queue (or for the duty-cycle budget) |
 | `.` | sent | The radio transmitted it. For a DM, the acknowledgement has not arrived (yet). Public channel messages stay `.` because the channel has no acknowledgements. |
 | `v` | acknowledged | The recipient's ACK came back: the DM was delivered and decrypted |
-| `?` | waiting for key | The recipient's public key is unknown. The DM is held until the key arrives (see below). |
-| `x` | failed | The transmission failed (`Falha no TX`: the radio reported an error while sending, or was not ready), the recipient answered with an error (NAK), or the key was missing at send time |
+| `?` | waiting for key | The recipient's public key is unknown. The DM is held until the key arrives, for at most 10 minutes (see below). |
+| `x` | failed | The transmission failed (`Falha no TX`: the radio reported an error while sending), the recipient answered with an error (NAK), the key was missing at send time, or the key did not arrive within 10 minutes |
 
 **The `?` state.** A DM can only be encrypted with the recipient's public key, which arrives in its NodeInfo. When you send to a node without a key:
 
@@ -233,7 +233,7 @@ Your own messages start with a state marker followed by `>`. Received messages s
 2. The device sends **its own NodeInfo directly to that node, asking for the node's NodeInfo in return** (at most once per minute per node).
 3. When the node's NodeInfo arrives, every `?` message to it changes to `~` and is sent.
 
-If the node is out of range or does not answer, the message stays at `?`. Resending or pressing `Enviar NodeInfo` can help once the node is reachable.
+While the message is at `?`, the device repeats the NodeInfo request to that node at most once per minute. If no key arrives within **10 minutes**, the message changes to `x`. It also changes to `x` when the 10-DM queue is full and you send a DM to a node whose key is known: the oldest `?` message gives way. Resending or pressing `Enviar NodeInfo` can help once the node is reachable.
 
 **No automatic retry.** If a DM stays at `.` (no ACK), the firmware does not send it again. Type it again if needed.
 
@@ -252,7 +252,7 @@ It transmits only in these cases:
 | You send a message | Public text (Canal) or encrypted DM with want_ack (Conversa) | When you press Enter |
 | You send a DM to a node without a key | NodeInfo sent directly to that node with want_response | At most once per minute per node |
 | Auto-greet is ON | Greeting DM to a newly keyed node | One every 30 s, once per node ever |
-| You receive a DM that asks for an ACK | ACK to the sender (and again if the sender retransmits the same DM) | Once per DM received |
+| You receive a DM that asks for an ACK | ACK to the sender (and again if the sender retransmits the same DM) | Once per DM received, plus at most 2 repeats for its retransmissions |
 | A node asks for our NodeInfo (want_response) | NodeInfo to that node | At most once every 30 s in total **and** once every 12 h per node |
 | A node sends us an encrypted DM but we lack its key | NAK (`PKI_UNKNOWN_PUBKEY`) plus our NodeInfo with want_response, so its next attempt can be decrypted | At most once every 30 s in total and once every 10 min per node |
 
@@ -290,7 +290,7 @@ A node appears in the list as soon as any decodable frame from it is heard: tele
 | `duty limit` (red) | The region's airtime budget for the last hour is used up, and frames are waiting | Nothing is lost. Frames go out as the budget frees up, within the hour. Config shows `Ar 1h: ...`. Only EU_868, UA_868 and TH have a budget. |
 | `-dBm` | No frame received since boot | See [Why no nodes appear](#why-no-nodes-appear). |
 
-When the radio is not working, attempts to transmit also produce the toast `Falha no TX` (the radio is not ready).
+When the radio is not working (`SEM CAP LoRa` or `RADIO ERRO`), nothing is transmitted: frames wait in the queue (your messages stay at `~`) and are not marked as failed.
 
 ### Toasts (yellow, 2.5 s)
 
@@ -299,12 +299,13 @@ When the radio is not working, attempts to transmit also produce the toast `Falh
 | `Config salva` | "Settings saved" to flash | Nothing. |
 | `ERRO ao gravar config` | "Error saving settings": the flash write failed | The setting is active until reboot but may be lost. Try again. If it keeps failing, the NVS partition may be full or damaged. |
 | `ERRO: chave nao gravada!` (at boot) | "Error: key not saved": a new key pair was generated but could not be stored | The key will change at the next boot, and nodes that stored the old key will reject the new one. Check flash/NVS (reinstall). Also shown on Config as `ERRO: chave não gravada na NVS!`. |
+| `Nova chave gerada` (at boot) | "New key generated": no key pair was stored (first boot, or the NVS was erased), so a new one was created and saved | Nothing on a first boot. If it appears later, the NVS was erased: nodes that stored your old key may reject the new one until they forget it. |
 | `ERRO no radio` | "Radio error" while changing region or power | Power-cycle. The radio may not be on the shown frequency. |
 | `Fora da faixa do Cap (exp)` | "Outside the Cap's band (experimental)": you selected an experimental region | Fine if it is your country's region. Expect reduced range. |
-| `Falha no TX` | "TX failed": the radio reported an error while sending, or the radio is not ready (e.g. Cap not detected) | The message is marked `x`. Check the status bar for `SEM CAP LoRa` / `RADIO ERRO` and power-cycle. |
+| `Falha no TX` | "TX failed": the radio reported an error while sending | The message is marked `x`. Send it again. If it keeps happening, power-cycle. |
 | `Texto longo demais` | "Text too long" (more than 199 bytes) | Shorten the message. The keyboard input already stops at 199 bytes. |
 | `Fila de TX cheia` | "TX queue full" (6 frames waiting) when sending to the channel | Wait a few seconds and send again. In duty-cycle regions the budget may be holding frames. |
-| `Fila de mensagens cheia` | "Message queue full": 10 DMs are already waiting (for example several `?` messages) | Wait for keys to arrive or for messages to go out. The DM was not stored. |
+| `Fila de mensagens cheia` | "Message queue full": 10 DMs are already waiting (for example several `?` messages) | Wait for keys to arrive or for messages to go out. `?` messages give up after 10 minutes, and a DM to a node whose key is known replaces the oldest `?` message. The DM was not stored. |
 | `Aguardando chave do no` | "Waiting for the node's key": DM stored with `?`, NodeInfo request sent | Wait for the node's NodeInfo. See [the `?` state](#message-markers). |
 | `NodeInfo em Ns` | "NodeInfo in N s": a NodeInfo broadcast was requested within 30 s of the previous one | Nothing. It goes out automatically. |
 | `Potência: 2 a 22 dBm` | "Power: 2 to 22 dBm": invalid value | Type a number from 2 to 22. |
@@ -319,6 +320,7 @@ When the radio is not working, attempts to transmit also produce the toast `Falh
 | A DM stays at `?` | The node's key has not arrived. See [the `?` state](#message-markers). |
 | A DM stays at `.` | It was transmitted but no ACK came back. The recipient may be out of range, or the ACK was lost. There is no automatic retry. |
 | A DM shows `x` right after `?` turned into `~` | The node's key disappeared before sending (for example the node was evicted from a full list). Send again. |
+| A saved contact reset their device and DMs no longer work | This device keeps the first key it saved for that contact and ignores the new one. See the [FAQ](#faq). |
 | Grey node without name | Frames from it were heard, but its NodeInfo was not. Wait, or open a chat and send a DM: that requests its NodeInfo. |
 | Header shows `(fora da lista)` | That node was evicted from the 100-node list. Its messages remain until they are pushed out. |
 | Keys ignored for a moment | A frame is being transmitted (up to about 2.2 s). |
@@ -383,3 +385,7 @@ No. It is a `CLIENT_MUTE` node and never rebroadcasts other nodes' packets.
 
 **Why does the greeting show a `?` on screen?**
 The 👋 emoji has no glyph in the screen font. It is sent correctly. See [Display limitations](#display-limitations).
+
+**A contact reset their device (new key) and our DMs stopped working. What can I do?**
+
+This firmware keeps the first public key it saved for each DM contact (up to 50) and ignores any other key for that node number, even after the contact drops out of the 100-node list. That protects you from impersonation, but it also means that if the contact factory-resets or erases their NVS and gets a new key, this device keeps rejecting it: they cannot decrypt your DMs and you cannot decrypt theirs. v1 has no action to forget one saved key (a "forget node key" action is on the [roadmap](roadmap.md)). Today the only way out is erasing this device's NVS, which also changes your own key and clears saved contacts, the greeted list and settings.

@@ -19,6 +19,7 @@ v0.1.0 is a deliberately small Meshtastic node. This page lists what it does not
 | **Battery indicator** | Read the battery ADC, which v1 does not use. It needs care: the RF entropy source used for key generation shares hardware with the ADC, so the ADC must be set up after key generation. |
 | **MeshCore?** | Support for the MeshCore protocol as an alternative mesh. To be explored. |
 | **Identity migration** | A versioned key record migration so that a future format change never regenerates the key. |
+| **Forget node key** | An action to forget one saved peer's key, so that a contact who factory-reset (new key) can be accepted again. Today a saved key can never be replaced. |
 
 ## Known limitations of v1
 
@@ -32,13 +33,14 @@ v0.1.0 is a deliberately small Meshtastic node. This page lists what it does not
 | **Text-screen scrolling** | History scrolls with `Fn`+`;` / `Fn`+`.`, one line per press. |
 | **No DM retry** | A DM without an ACK stays at `.`. |
 | **Messages in RAM only** | 30 per conversation, 96 in total, lost at power-off. |
-| **100 nodes in RAM** | The least recently heard node is dropped. A dropped node's key is kept only if it is a saved DM peer (up to 50). |
+| **100 nodes in RAM** | When the list is full, the least recently heard keyless node that is not a saved peer is dropped first, otherwise the least recently heard node. The keys of saved DM peers (up to 50) are kept in a separate table, so they survive being dropped from the list. |
+| **Saved peer keys cannot be replaced** | If a saved contact factory-resets and gets a new key, it is rejected and DMs with them stop working. There is no "forget node key" action yet. See the [user guide FAQ](user-guide.md#faq). |
 | **Greeted set of 500** | After 500 greeted nodes, auto-greet stops greeting new nodes, so that nobody is greeted twice. |
 | **Single channel and preset** | Default primary channel only, LongFast only. |
 | **No signatures** | XEdDSA is not implemented. See [security.md](security.md#what-is-not-protected). |
 | **No phone app, Wi-Fi, BLE or MQTT** | The device is configured only from its own keyboard. |
 | **Physical key extraction** | Flash encryption is off under M5Launcher, so the private key in NVS is readable with physical access. |
-| **Region change lost within 2 s** | A region change is saved 2 s after the last change, or when leaving Config. Switching off sooner loses it. |
+| **Region change lost within 2 s** | A region change is saved 2 s after the last change, or when leaving Config. Switching off sooner loses it. | Nothing is transmitted until it is saved.
 | **No auto-detection of the Cap at runtime** | If the Cap is missing at boot (`SEM CAP LoRa`), the firmware has to be restarted after fixing it. |
 | **Experimental regions** | IN, NZ_865, NP_865, KZ_863, JP, TW, TH are outside the Cap's rated 868–923 MHz, and their performance is unmeasured. |
 | **End-to-end interoperability not yet field-verified** | Radio init, TX, identity persistence and the UI are verified on the device. Exchanging DMs and channel messages with other Meshtastic nodes is implemented and covered by tests against upstream-compatible vectors, but has not yet been confirmed in the field. |

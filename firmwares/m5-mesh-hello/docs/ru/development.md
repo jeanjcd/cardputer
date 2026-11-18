@@ -107,7 +107,7 @@ python tools/gen_vectors.py
 | Native tests (ASan + UBSan) | `pio test -e native_sanitize` |
 | Device build | Проверяет закоммиченные образы в `bin/` командой `sha256sum -c SHA256SUMS`, выполняет `pio run -e cardputer` и загружает артефакт с образами релиза, собранным в CI `firmware.bin` и контрольными суммами |
 
-[`.github/workflows/codeql-m5-mesh-hello.yml`](../../../../.github/workflows/codeql-m5-mesh-hello.yml) запускает CodeQL (`c-cpp`, запросы `security-extended`, ручная сборка нативных тестовых программ) по тем же триггерам и еженедельно. Репозиторий приватный и без GitHub Advanced Security, поэтому результаты нельзя загрузить в code scanning. Они сохраняются как артефакт SARIF (`codeql-results-m5-mesh-hello`), и **задание падает при любой находке**. Когда репозиторий станет публичным, установите `upload: always` и добавьте `security-events: write` (см. комментарий в workflow).
+[`.github/workflows/codeql-m5-mesh-hello.yml`](../../../../.github/workflows/codeql-m5-mesh-hello.yml) запускает CodeQL (`c-cpp`, запросы `security-extended`, ручная сборка нативных тестовых программ) по тем же триггерам и еженедельно. Репозиторий публичный, поэтому результаты загружаются в code scanning и видны на вкладке **Security** репозитория. Они также сохраняются как артефакт SARIF (`codeql-results-m5-mesh-hello`), и **задание падает при любой находке**. Анализируется только сборка нативных тестов: переносимое ядро в `src/mesh/` и тесты. Код только для устройства в `src/app/` и `src/hw/` в эту сборку не входит.
 
 [`.github/dependabot.yml`](../../../../.github/dependabot.yml) еженедельно предлагает обновления зафиксированных GitHub Actions.
 

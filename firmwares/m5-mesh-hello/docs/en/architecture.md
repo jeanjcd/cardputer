@@ -124,7 +124,7 @@ Approximate static sizes on the ESP32-S3 (32-bit):
 | Structure | Size | Notes |
 |---|---|---|
 | `ChatStore` | ~21 KB | 96 slots × 224 B (200-byte text + state + peer + sequence) |
-| `NodeDb` | ~13 KB | 100 entries × 128 B + 50 persisted-slot records |
+| `NodeDb` | ~15 KB | 100 entries × 128 B + 50 persisted-slot records (the persisted keys are also pinned in RAM: 50 × 32 B) |
 | UI line buffer | ~9 KB | 210 wrapped lines × 44 B for history rendering |
 | `Outbox` | ~2.2 KB | 10 × 216 B |
 | `Greeter` | ~2 KB | 500 greeted IDs + 10 queued |
@@ -150,7 +150,7 @@ The `greeted` blob (2 KB) is assembled on the stack while it is being loaded or 
 | TX queue | 6 frames | `App::kTxQueue` |
 | Greeted set / greet queue | 500 / 10 | `Greeter` |
 | Dedup cache | 64 pairs | `DedupCache` |
-| Re-ACK memory | 8 DMs | `App::ackFrom_` |
+| Re-ACK memory | 8 DMs, at most 2 re-ACKs each | `AckMemory` |
 | Gap between our frames | 1.5 s | `kTxGapMs` |
 | Auto-greet interval | 30 s | `Greeter` |
 | NodeInfo period | 3 h | `kNodeInfoPeriodMs` |

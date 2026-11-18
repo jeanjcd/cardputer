@@ -19,8 +19,8 @@ Esta página trata de lo que M5-Mesh-Hello v0.1.0 protege, lo que no protege y c
 
 - **Cada byte que llega de la radio es no confiable.** El analizador del encabezado, el decodificador de protobuf, el descifrado y la lógica de la aplicación comprueban cada longitud e índice frente a búferes de tamaño fijo. Se rechazan las tramas de más de 255 bytes, los payloads de más de 239 bytes, los campos de protobuf que se salen del final, los campos `payload` demasiado grandes y las claves públicas que no tienen 32 bytes.
 - **Sin reservas de heap en la ruta de RX.** Todos los búferes tienen tamaño fijo, y la estructura decodificada grande es estática.
-- **Fuzzing y sanitizers.** `test/test_fuzz` pasa 200000 tramas aleatorias y mutadas por toda la ruta de recepción. La CI ejecuta todas las pruebas nativas, incluida la de fuzzing, con AddressSanitizer y UndefinedBehaviorSanitizer.
-- **Análisis estático.** CodeQL (`security-extended`) se ejecuta en cada push y pull request y cada semana. El job falla ante cualquier hallazgo.
+- **Fuzzing y sanitizers.** `test/test_fuzz` pasa 200000 tramas aleatorias y mutadas por los decodificadores del protocolo: `headerParse`, los decodificadores de protobuf, `pkiDecrypt` y `parseFrame`. La capa de aplicación que está por encima (`App::handleFrame` en `src/app/`) solo se ejecuta en el dispositivo y no pasa por el fuzzing; su lógica de decisión (tabla de nodos, cola de salida, límites de frecuencia, configuración) tiene pruebas unitarias en `src/mesh/`. La CI ejecuta todas las pruebas nativas, incluida la de fuzzing, con AddressSanitizer y UndefinedBehaviorSanitizer.
+- **Análisis estático.** CodeQL (`security-extended`) se ejecuta en cada push y pull request y cada semana, y sus resultados aparecen en la pestaña Security del repositorio. Analiza la compilación de las pruebas nativas, es decir, el núcleo portable de `src/mesh/` más las pruebas; el código exclusivo del dispositivo en `src/app/` y `src/hw/` no se compila ahí y, por tanto, no se analiza. El job falla ante cualquier hallazgo.
 
 ### Criptografía
 
@@ -34,12 +34,14 @@ Esta página trata de lo que M5-Mesh-Hello v0.1.0 protege, lo que no protege y c
 ### Comportamiento de la radio y antiabuso
 
 - **El Wi-Fi y el Bluetooth están apagados.** La única interfaz remota es LoRa.
+- **No se transmite nada antes de elegir la región.** En el primer arranque (sin región válida guardada) la radio solo escucha hasta que el usuario confirma una región. Mientras hay un cambio de región pendiente, o mientras el Cap o la radio no funcionan, las tramas se quedan en la cola.
 - **El dispositivo nunca retransmite** el tráfico de otros nodos (`CLIENT_MUTE`).
 - **Las respuestas automáticas tienen límite de frecuencia**, por nodo y globalmente, para que números `from` falsificados no puedan mantener el dispositivo en el aire:
   - Respuestas de NodeInfo: una vez cada 12 h por nodo y una vez cada 30 s en total.
   - NAK + NodeInfo para DM PKI que no podemos descifrar: una vez cada 10 min por nodo y una vez cada 30 s en total.
   - Solicitudes de NodeInfo cuando envías un DM a un nodo sin clave: una vez cada 60 s por nodo.
   - Nuestras propias difusiones de NodeInfo: como máximo una cada 30 s, más una cada 3 h.
+  - ACK para retransmisiones de un DM que ya confirmamos: como máximo 2 por DM.
 - **Ritmo de transmisión**: una trama a la vez, separadas al menos 1.5 s, una cola de 6 tramas y el presupuesto de tiempo en el aire del ciclo de trabajo de la región.
 - **Saludo automático**: desactivado al arrancar, saluda a cada nodo como máximo una vez (persistente), como máximo un saludo cada 30 s, con una cola de 10.
 - **Supresión de duplicados** de los últimos 64 pares `(from, id)`.
@@ -47,7 +49,7 @@ Esta página trata de lo que M5-Mesh-Hello v0.1.0 protege, lo que no protege y c
 
 ### Identidad y claves
 
-- **Gana la primera clave**: se conserva la primera clave pública recibida para un número de nodo, y se ignora un NodeInfo posterior con otra clave. Las claves de los contactos de DM se guardan de forma persistente, así que esto sobrevive a los reinicios.
+- **Gana la primera clave**: se conserva la primera clave pública recibida para un número de nodo, y se ignora un NodeInfo posterior con una clave distinta (o sin clave). Las claves de los contactos de DM se guardan (hasta 50), así que esto sobrevive a los reinicios. Las claves guardadas también se mantienen en una tabla aparte en RAM, de modo que una avalancha de nodos falsos que saque a un contacto guardado de la lista de 100 nodos no puede sustituir su clave: la clave guardada se sigue usando para los DM y se sigue comprobando en cada NodeInfo de ese número de nodo. Cuando la lista está llena, primero se descartan los nodos sin clave que no son contactos guardados.
 - **Se rechazan los DM heredados**: un DM de texto cifrado solo con la clave del canal público se descarta, así que un DM que aparece en una conversación siempre se autenticó mediante PKI con la clave guardada del remitente.
 
 ### Cadena de suministro
@@ -62,6 +64,7 @@ Esta página trata de lo que M5-Mesh-Hello v0.1.0 protege, lo que no protege y c
 - **El canal público lo puede leer cualquiera.** Usa la clave por defecto bien conocida de Meshtastic, por diseño, así que cada mensaje que envías en la pantalla Canal, y cada NodeInfo (nombres, clave pública, modelo de hardware), es público.
 - **Sin firmas de paquetes (XEdDSA) en v1.** Las tramas de difusión, incluidos los textos de canal y los NodeInfo, no están autenticadas. Cualquiera puede enviar un mensaje de canal o un NodeInfo que diga tener cualquier número de nodo. La política por defecto de Meshtastic también acepta paquetes sin firmar.
 - **Suplantación antes de conocer la clave.** Los números de nodo no están vinculados a claves. Mientras no hayamos guardado la clave real de un nodo, un atacante puede enviar un NodeInfo con ese número de nodo y su propia clave, y la regla "gana la primera clave" conserva entonces la clave del atacante. Los DM "para" ese nodo irían al atacante, y los DM del nodo real se rechazarían. Es una propiedad del protocolo oficial.
+- **La clave de un contacto guardado no se puede sustituir.** Es la otra cara de "gana la primera clave": si un contacto restablece su dispositivo de fábrica o borra su NVS y obtiene una clave nueva, este dispositivo la sigue rechazando, y los DM con ese contacto dejan de funcionar. La v1 no tiene ninguna acción para olvidar una clave guardada (consulta la [hoja de ruta](roadmap.md)).
 - **Los metadatos son visibles.** Los números de nodo, los nombres, el modelo de hardware, el momento y el tamaño de los paquetes y quién envía a quién (los campos `to`/`from` del encabezado no están cifrados) son visibles para cualquier receptor. Tu ID de nodo se deriva de la dirección MAC del dispositivo.
 - **El contenido de los DM está cifrado de extremo a extremo, pero la entrega no está garantizada.** No hay reintentos, y un atacante puede interferir la frecuencia (jamming) o eliminar los ACK.
 - **La denegación de servicio en la capa física** (jamming) queda fuera del alcance.

@@ -21,13 +21,12 @@ jobs:
     name: CodeQL (c-cpp)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Code-scanning upload needs GitHub Advanced Security on a private repo, so
-    # results are kept as a SARIF artifact and the job fails on any finding.
-    # When the repo becomes public: set `upload: always` on analyze and add
-    # `security-events: write` here.
+    # The repo is public: results are uploaded to the Security tab (code
+    # scanning), also kept as a SARIF artifact, and the job fails on any finding.
     permissions:
       contents: read
       actions: read
+      security-events: write
     defaults:
       run:
         working-directory: firmwares/m5-mesh-hello
@@ -52,7 +51,7 @@ jobs:
       - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: "/language:c-cpp/m5-mesh-hello"
-          upload: never
+          upload: always
           output: codeql-results
       - name: Upload SARIF
         if: always()

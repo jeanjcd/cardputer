@@ -16,7 +16,7 @@ Este não é o firmware oficial do Meshtastic. É uma implementação mínima es
 - Chat no **canal público**.
 - **Saudação automática**: desligada a cada inicialização. Quando ligada, envia sua saudação uma única vez por nó, para sempre (lista persistida), no máximo uma a cada 30 s.
 - **18 regiões** (11 dentro da faixa nominal do Cap e 7 experimentais), com a potência de TX limitada ao máximo de cada região e um orçamento de tempo no ar por hora nas regiões com ciclo de trabalho (duty cycle).
-- Nome longo/curto, texto da saudação e potência de TX editáveis. O par de chaves é gerado uma única vez a partir da entropia do hardware e nunca muda.
+- Nome longo/curto, texto da saudação e potência de TX editáveis. O par de chaves é gerado uma única vez a partir da entropia do hardware e fica guardado na NVS (só muda se a NVS for apagada).
 - Nunca retransmite o tráfego de outros nós (`CLIENT_MUTE`). Wi-Fi e Bluetooth ficam desligados.
 - Núcleo de protocolo portátil com testes unitários nativos, teste de fuzzing, ASan/UBSan e CodeQL na CI.
 
@@ -70,8 +70,8 @@ Detalhes: [docs/pt-BR/hardware.md](docs/pt-BR/hardware.md).
    ```
 2. Copie `bin/M5-Mesh-Hello.bin` para o cartão microSD e instale com o **M5Launcher**. Se houver uma versão anterior instalada, remova-a antes (**PMan → Remove**).
    (`bin/M5-Mesh-Hello-merged.bin` é uma imagem completa da flash para o esptool no endereço `0x0`. Gravá-la **apaga o M5Launcher e todos os apps instalados por ele**. Use-a só se você não usa o M5Launcher.)
-3. Conecte a antena e inicie o app. Na primeira inicialização ele cria seu par de chaves, se anuncia e começa a escutar.
-4. Na tela **Config**, confira a **região** (`Região`): todos os nós precisam usar a mesma. O padrão é ANZ (919.875 MHz).
+3. Conecte a antena e inicie o app. Na primeira inicialização ele cria seu par de chaves e pergunta a sua **região** (ANZ pré-selecionada; `;` / `.` para mudar, `Enter` para confirmar). **Nada é transmitido até você confirmar.** Depois ele se anuncia e começa a escutar.
+4. Você pode mudar a região depois na tela **Config** (`Região`): todos os nós precisam usar a mesma, e você deve usar a que é legal no seu país.
 5. Espere os nós aparecerem na tela **Nós**, selecione um, pressione `Enter` e envie a saudação já preenchida. Ou pressione `A` para ligar a saudação automática.
 
 ## Regiões

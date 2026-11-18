@@ -103,7 +103,7 @@ The generator is deterministic. The output must be byte-identical unless you cha
 | Native tests (ASan + UBSan) | `pio test -e native_sanitize` |
 | Device build | Verifies the committed `bin/` images with `sha256sum -c SHA256SUMS`, runs `pio run -e cardputer`, and uploads an artifact with the release images, the CI-built `firmware.bin` and checksums |
 
-[`.github/workflows/codeql-m5-mesh-hello.yml`](../../../../.github/workflows/codeql-m5-mesh-hello.yml) runs CodeQL (`c-cpp`, `security-extended` queries, manual build of the native test programs) on the same triggers and weekly. The repository is private and has no GitHub Advanced Security, so results cannot be uploaded to code scanning. They are kept as a SARIF artifact (`codeql-results-m5-mesh-hello`), and **the job fails if there is any finding**. When the repository becomes public, set `upload: always` and add `security-events: write` (see the comment in the workflow).
+[`.github/workflows/codeql-m5-mesh-hello.yml`](../../../../.github/workflows/codeql-m5-mesh-hello.yml) runs CodeQL (`c-cpp`, `security-extended` queries, manual build of the native test programs) on the same triggers and weekly. The repository is public, so results are uploaded to code scanning and appear in the repository's **Security** tab. They are also kept as a SARIF artifact (`codeql-results-m5-mesh-hello`), and **the job fails if there is any finding**. Only the native test build is analysed: the portable core in `src/mesh/` and the tests. The device-only code in `src/app/` and `src/hw/` is not part of that build.
 
 [`.github/dependabot.yml`](../../../../.github/dependabot.yml) proposes weekly updates for the pinned GitHub Actions.
 

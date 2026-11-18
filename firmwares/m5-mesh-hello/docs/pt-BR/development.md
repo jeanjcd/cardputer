@@ -107,7 +107,7 @@ O gerador é determinístico. A saída precisa ser idêntica byte a byte, a meno
 | Native tests (ASan + UBSan) | `pio test -e native_sanitize` |
 | Device build | Verifica as imagens commitadas em `bin/` com `sha256sum -c SHA256SUMS`, roda `pio run -e cardputer` e sobe um artefato com as imagens da versão, o `firmware.bin` compilado pela CI e os checksums |
 
-[`.github/workflows/codeql-m5-mesh-hello.yml`](../../../../.github/workflows/codeql-m5-mesh-hello.yml) roda o CodeQL (`c-cpp`, consultas `security-extended`, compilação manual dos programas de teste nativos) nos mesmos gatilhos e semanalmente. O repositório é privado e não tem GitHub Advanced Security, então os resultados não podem ser enviados ao code scanning. Eles ficam guardados como artefato SARIF (`codeql-results-m5-mesh-hello`), e **o job falha se houver qualquer achado**. Quando o repositório ficar público, defina `upload: always` e adicione `security-events: write` (veja o comentário no workflow).
+[`.github/workflows/codeql-m5-mesh-hello.yml`](../../../../.github/workflows/codeql-m5-mesh-hello.yml) roda o CodeQL (`c-cpp`, consultas `security-extended`, compilação manual dos programas de teste nativos) nos mesmos gatilhos e semanalmente. O repositório é público, então os resultados são enviados ao code scanning e aparecem na aba **Security** do repositório. Eles também ficam guardados como artefato SARIF (`codeql-results-m5-mesh-hello`), e **o job falha se houver qualquer achado**. Só a compilação dos testes nativos é analisada: o núcleo portável em `src/mesh/` e os testes. O código exclusivo do aparelho em `src/app/` e `src/hw/` não faz parte dessa compilação.
 
 [`.github/dependabot.yml`](../../../../.github/dependabot.yml) propõe atualizações semanais das GitHub Actions fixadas.
 

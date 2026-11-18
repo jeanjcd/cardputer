@@ -143,7 +143,7 @@ Un `User` recibido cuyo `public_key` está presente pero no tiene exactamente 32
 
 ## Gestión de claves desconocidas
 
-- **Envío a un nodo sin clave**: el DM queda retenido (estado `?`) y enviamos nuestro NodeInfo **directamente** a ese nodo con `want_response = 1` (como máximo una vez cada 60 s por nodo). Cuando llega su NodeInfo con clave, se liberan los DM retenidos.
+- **Envío a un nodo sin clave**: el DM queda retenido (estado `?`) y enviamos nuestro NodeInfo **directamente** a ese nodo con `want_response = 1` (como máximo una vez cada 60 s por nodo). Cuando llega su NodeInfo con clave, se liberan los DM retenidos. La petición se repite como máximo una vez cada 60 s mientras haya DM retenidos; un DM retenido falla (`x`) a los 10 minutos, o antes si la cola de 10 DM está llena y un DM a un nodo con clave necesita el sitio.
 - **Recepción de un DM PKI de un nodo sin clave**: enviamos un NAK `Routing{error_reason = 35 (PKI_UNKNOWN_PUBKEY)}` con `request_id` = su ID de paquete, más nuestro NodeInfo con `want_response = 1`. Límites: una vez cada 10 minutos por nodo y una vez cada 30 s en total. Las tramas que no se pueden decodificar **no** se añaden a la caché de duplicados, para que el reintento del remitente se pueda descifrar una vez llegada la clave.
 
 ## NodeInfo
