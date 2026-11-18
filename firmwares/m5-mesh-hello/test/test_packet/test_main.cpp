@@ -88,6 +88,7 @@ void test_ack_roundtrip() {
   TEST_ASSERT_TRUE(parseFrame(A, f, n, lookupNone, in));
   TEST_ASSERT_TRUE(in.kind == InKind::Ack);
   TEST_ASSERT_EQUAL_HEX32(0x5555, in.ackedId);
+  TEST_ASSERT_EQUAL_UINT32(0, in.routingError);
   TEST_ASSERT_FALSE(in.h.wantAck);
   TEST_ASSERT_EQUAL_HEX8(0x08, in.h.channel);
 }
@@ -140,6 +141,41 @@ void test_legacy_text_dm_rejected() {
   TEST_ASSERT_FALSE(parseFrame(B, f, 16 + pn, lookupA, in));
 }
 
+// Hand-builds a channel-key ROUTING frame from B to A with the given request_id and Routing bytes.
+static size_t buildRouting(uint32_t to, uint32_t requestId, const uint8_t* routing, size_t rlen, uint8_t* f) {
+  MeshData d; d.portnum = 5; d.requestId = requestId;
+  memcpy(d.payload, routing, rlen); d.payloadLen = rlen;
+  uint8_t pl[64]; size_t pn = pbEncodeData(d, pl, sizeof pl);
+  PacketHeader h{}; h.to = to; h.from = B.nodeNum; h.id = 99; h.hopLimit = 3; h.hopStart = 3; h.channel = 0x08;
+  headerWrite(h, f);
+  memcpy(f + 16, pl, pn);
+  ctrCrypt(kDefaultKey, h.id, h.from, f + 16, pn);
+  return 16 + pn;
+}
+
+void test_routing_nak_surfaces_error() {
+  uint8_t f[128]; Inbound in;
+  const uint8_t nak[] = {0x18, 0x23};  // Routing{error_reason = 35 (PKI_UNKNOWN_PUBKEY)}
+  size_t n = buildRouting(A.nodeNum, 0xBEEF, nak, sizeof nak, f);
+  TEST_ASSERT_TRUE(parseFrame(A, f, n, lookupNone, in));
+  TEST_ASSERT_TRUE(in.kind == InKind::Ack);
+  TEST_ASSERT_EQUAL_HEX32(0xBEEF, in.ackedId);
+  TEST_ASSERT_EQUAL_UINT32(35, in.routingError);
+  // empty Routing = NONE = plain ACK
+  n = buildRouting(A.nodeNum, 0xBEEF, nak, 0, f);
+  TEST_ASSERT_TRUE(parseFrame(A, f, n, lookupNone, in));
+  TEST_ASSERT_EQUAL_UINT32(0, in.routingError);
+  // not addressed to us, or no request_id: ignored
+  n = buildRouting(0x12345678, 0xBEEF, nak, sizeof nak, f);
+  TEST_ASSERT_FALSE(parseFrame(A, f, n, lookupNone, in));
+  n = buildRouting(A.nodeNum, 0, nak, sizeof nak, f);
+  TEST_ASSERT_FALSE(parseFrame(A, f, n, lookupNone, in));
+  // malformed Routing (truncated varint)
+  const uint8_t bad[] = {0x18};
+  n = buildRouting(A.nodeNum, 0xBEEF, bad, sizeof bad, f);
+  TEST_ASSERT_FALSE(parseFrame(A, f, n, lookupNone, in));
+}
+
 void test_packet_id_nonzero_and_counter() {
   uint32_t a = nextPacketId(5), b = nextPacketId(5);
   TEST_ASSERT_TRUE(a != 0 && b != 0);
@@ -161,5 +197,6 @@ int main() {
   RUN_TEST(test_ignores_own_and_duplicate);
   RUN_TEST(test_legacy_text_dm_rejected);
   RUN_TEST(test_packet_id_nonzero_and_counter);
+  RUN_TEST(test_routing_nak_surfaces_error);
   return UNITY_END();
 }

@@ -111,7 +111,7 @@ size_t buildDirectText(const Identity& me, uint32_t id, uint32_t to, const uint8
 bool parseFrame(const Identity& me, const uint8_t* frame, size_t len,
                 const uint8_t* (*peerPubLookup)(uint32_t nodeNum), Inbound& out) {
   out.kind = InKind::None;
-  out.direct = false; out.pki = false; out.ackedId = 0;
+  out.direct = false; out.pki = false; out.ackedId = 0; out.routingError = 0;
   if (!frame || len < kHdr || len > kHdr + kMaxPayload) return false;
   if (!headerParse(frame, len, out.h)) return false;
   const PacketHeader& h = out.h;
@@ -157,8 +157,9 @@ bool parseFrame(const Identity& me, const uint8_t* frame, size_t len,
       if (h.to != me.nodeNum) return false;
       uint32_t err = 0;
       if (!pbDecodeRoutingError(out.data.payload, out.data.payloadLen, err)) return false;
-      if (err != 0) return false;  // NAK/error: not an ACK
+      if (out.data.requestId == 0) return false;  // not a reply to one of our packets
       out.ackedId = out.data.requestId;
+      out.routingError = err;  // non-zero: NAK
       out.kind = InKind::Ack;
       return true;
     }

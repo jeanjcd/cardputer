@@ -36,9 +36,10 @@ struct Inbound {
   MeshData data;
   MeshUser user;
   uint32_t ackedId;
+  uint32_t routingError;  // for Ack: Routing.error_reason (0 = ACK, otherwise a NAK for ackedId)
 };
 
-/// Parses and decrypts a frame; returns true only for Text, NodeInfo or Ack events (false for anything else or malformed).
+/// Parses and decrypts a frame; returns true only for Text, NodeInfo or Ack/NAK events (false for anything else or malformed).
 bool parseFrame(const Identity& me, const uint8_t* frame, size_t len,
                 const uint8_t* (*peerPubLookup)(uint32_t nodeNum), Inbound& out);
 

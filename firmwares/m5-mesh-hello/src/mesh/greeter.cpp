@@ -56,11 +56,28 @@ void Greeter::onNodeWithKey(uint32_t num) {
 bool Greeter::due(uint32_t nowMs, uint32_t& outNum) {
   if (!enabled_ || qn_ == 0 || gn_ >= persistCap_) return false;
   if (haveLast_ && (uint32_t)(nowMs - last_) < interval_) return false;
+  if (haveFail_ && (uint32_t)(nowMs - failAt_) < kRetryBackoffMs) return false;
   greeted_[gn_++] = q_[0];
-  if (!persist()) { gn_--; return false; }  // never hand out a node we could not record as greeted
+  if (!persist()) {  // never hand out a node we could not record as greeted
+    gn_--;
+    haveFail_ = true; failAt_ = nowMs;
+    return false;
+  }
+  haveFail_ = false;
   outNum = q_[0];
   for (size_t i = 0; i + 1 < qn_; i++) q_[i] = q_[i + 1];
   qn_--;
   haveLast_ = true; last_ = nowMs;
+  return true;
+}
+
+bool Greeter::markGreeted(uint32_t num) {
+  if (wasGreeted(num)) return true;
+  if (gn_ >= persistCap_) return false;
+  greeted_[gn_++] = num;
+  if (!persist()) { gn_--; return false; }
+  size_t w = 0;
+  for (size_t i = 0; i < qn_; i++) if (q_[i] != num) q_[w++] = q_[i];
+  qn_ = w;
   return true;
 }

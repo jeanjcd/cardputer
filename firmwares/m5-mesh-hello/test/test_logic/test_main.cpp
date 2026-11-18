@@ -319,8 +319,70 @@ void test_greeter_persist_failure_keeps_queued() {
   TEST_ASSERT_FALSE(g.due(0, n));
   TEST_ASSERT_FALSE(g.wasGreeted(5));
   kv.failPut = false;
-  TEST_ASSERT_TRUE(g.due(1, n));
+  TEST_ASSERT_FALSE(g.due(1, n));       // backing off: Kv not retried yet
+  TEST_ASSERT_FALSE(g.due(59999, n));
+  TEST_ASSERT_TRUE(g.due(60000, n));
   TEST_ASSERT_EQUAL_UINT32(5, n);
+}
+
+// Counts put() calls to prove the greeter does not hammer the Kv while backing off.
+struct CountingKv : FakeKv {
+  int puts = 0;
+  bool put(const char* k, const void* buf, size_t len) override { puts++; return FakeKv::put(k, buf, len); }
+};
+
+void test_greeter_persist_failure_backoff() {
+  CountingKv kv; Greeter g(kv); g.setEnabled(true);
+  g.onNodeWithKey(5);
+  uint32_t n = 0;
+  kv.failPut = true;
+  TEST_ASSERT_FALSE(g.due(1000, n));
+  TEST_ASSERT_EQUAL_INT(1, kv.puts);
+  for (uint32_t t = 1001; t < 61000; t += 7) g.due(t, n);
+  TEST_ASSERT_EQUAL_INT(1, kv.puts);
+  TEST_ASSERT_FALSE(g.due(61000, n));  // retried once after 60 s, failed again
+  TEST_ASSERT_EQUAL_INT(2, kv.puts);
+  kv.failPut = false;
+  TEST_ASSERT_FALSE(g.due(61001, n));
+  TEST_ASSERT_TRUE(g.due(121000, n));
+  TEST_ASSERT_EQUAL_UINT32(5, n);
+  TEST_ASSERT_EQUAL_INT(3, kv.puts);
+  // a success clears the backoff: the next greeting only waits the normal interval
+  g.onNodeWithKey(6);
+  TEST_ASSERT_TRUE(g.due(151000, n));
+  TEST_ASSERT_EQUAL_UINT32(6, n);
+}
+
+void test_greeter_mark_manual() {
+  FakeKv kv; Greeter g(kv); g.setEnabled(true);
+  g.onNodeWithKey(5); g.onNodeWithKey(6);
+  TEST_ASSERT_TRUE(g.markGreeted(5));
+  TEST_ASSERT_TRUE(g.wasGreeted(5));
+  TEST_ASSERT_TRUE(g.markGreeted(5));  // idempotent
+  TEST_ASSERT_EQUAL_UINT32(1, g.greetedCount());
+  uint32_t n = 0;
+  TEST_ASSERT_TRUE(g.due(0, n));
+  TEST_ASSERT_EQUAL_UINT32(6, n);  // 5 left the queue
+  TEST_ASSERT_FALSE(g.due(100000, n));
+  kv.failPut = true;
+  TEST_ASSERT_FALSE(g.markGreeted(7));
+  TEST_ASSERT_FALSE(g.wasGreeted(7));
+  kv.failPut = false;
+  Greeter g2(kv); g2.load();
+  TEST_ASSERT_TRUE(g2.wasGreeted(5));
+  TEST_ASSERT_TRUE(g2.wasGreeted(6));
+}
+
+void test_nodedb_get_mutable() {
+  FakeKv kv; NodeDb db(kv);
+  TEST_ASSERT_NULL(db.get(3));
+  db.touch(3, -80, 1.0f, 10);
+  NodeEntry* e = db.get(3);
+  TEST_ASSERT_NOT_NULL(e);
+  e->unread = 2;
+  TEST_ASSERT_EQUAL_UINT8(2, db.at(0).unread);
+  db.touch(3, -81, 1.0f, 20);  // touch keeps UI flags
+  TEST_ASSERT_EQUAL_UINT8(2, db.at(0).unread);
 }
 
 void test_sizes() {
@@ -343,6 +405,9 @@ int main() {
   RUN_TEST(test_chat_per_peer_cap_and_order);
   RUN_TEST(test_chat_settext_alias);
   RUN_TEST(test_greeter_persist_failure_keeps_queued);
+  RUN_TEST(test_greeter_persist_failure_backoff);
+  RUN_TEST(test_greeter_mark_manual);
+  RUN_TEST(test_nodedb_get_mutable);
   RUN_TEST(test_sizes);
   RUN_TEST(test_greeter_disabled_ignores);
   RUN_TEST(test_greeter_once_per_node);

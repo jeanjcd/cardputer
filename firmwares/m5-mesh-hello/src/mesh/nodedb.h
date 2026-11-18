@@ -36,6 +36,8 @@ class NodeDb {
   const uint8_t* pubKey(uint32_t num) const;
   /// Persists name and key of a node that has a key (least recently persisted slot is overwritten at cap of 50).
   void persistPeer(uint32_t num);
+  /// Mutable entry for node num (for UI flags such as unread), or nullptr; valid until the next touch/load.
+  NodeEntry* get(uint32_t num) { int i = find(num); return i >= 0 ? &e_[i] : nullptr; }
   /// Number of nodes in RAM.
   size_t count() const { return n_; }
   /// Node at index i (0 = most recently heard); i must be < count().
