@@ -27,16 +27,19 @@ void test_freq_all_regions() {
   TEST_ASSERT_FLOAT_WITHIN(0.001f, 864.875f, lf(Region::NZ_865));  // 16 ch, slot 3 (experimental)
   TEST_ASSERT_FLOAT_WITHIN(0.001f, 867.875f, lf(Region::NP_865));  // 12 ch, slot 11 (experimental)
   TEST_ASSERT_FLOAT_WITHIN(0.001f, 866.875f, lf(Region::KZ_863));  // 20 ch, slot 15 (experimental)
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 923.375f, lf(Region::JP));      // 12 ch, slot 11 (experimental)
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 923.875f, lf(Region::TW));      // 20 ch, slot 15 (experimental)
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 923.875f, lf(Region::TH));      // 20 ch, slot 15 (experimental)
 }
 
 void test_every_region_in_cap_band() {
-  TEST_ASSERT_EQUAL_UINT32(15, regionCount());
+  TEST_ASSERT_EQUAL_UINT32(18, regionCount());
   size_t experimental = 0;
   for (size_t i = 0; i < regionCount(); i++) {
     float f = lf(regionAt(i).id);
     if (regionAt(i).experimental) {
       experimental++;
-      TEST_ASSERT_TRUE_MESSAGE(f >= 860.0f && f < 868.0f, regionAt(i).name);
+      TEST_ASSERT_TRUE_MESSAGE((f >= 860.0f && f < 868.0f) || (f > 923.0f && f <= 925.0f), regionAt(i).name);
     } else {
       TEST_ASSERT_TRUE_MESSAGE(f >= 868.0f && f <= 923.0f, regionAt(i).name);
     }
@@ -44,14 +47,16 @@ void test_every_region_in_cap_band() {
     TEST_ASSERT_TRUE(regionFromId((uint8_t)regionAt(i).id, back));
     TEST_ASSERT_TRUE(back == regionAt(i).id);
   }
-  TEST_ASSERT_EQUAL_UINT32(4, experimental);
+  TEST_ASSERT_EQUAL_UINT32(7, experimental);
+  TEST_ASSERT_TRUE(regionInfo(Region::TH).experimental);
+  TEST_ASSERT_EQUAL_UINT8(10, regionInfo(Region::TH).dutyCycle);
   TEST_ASSERT_TRUE(regionInfo(Region::IN).experimental);
   TEST_ASSERT_FALSE(regionInfo(Region::ANZ).experimental);
   TEST_ASSERT_TRUE(regionAt(0).id == Region::ANZ);  // default first
   TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)Region::ANZ);     // ids of earlier builds
   TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)Region::BR_902);
   Region r;
-  TEST_ASSERT_FALSE(regionFromId(15, r));
+  TEST_ASSERT_FALSE(regionFromId(18, r));
   // cycling visits every region and wraps
   Region c = Region::ANZ;
   for (size_t i = 0; i < regionCount(); i++) c = regionNext(c);
@@ -67,6 +72,7 @@ void test_effective_power() {
   TEST_ASSERT_EQUAL_INT8(20, effectiveTxPower(Region::SG_923, 22));  // limit 20
   TEST_ASSERT_EQUAL_INT8(22, effectiveTxPower(Region::EU_868, 22));  // limit 27, cap 22
   TEST_ASSERT_EQUAL_INT8(2, effectiveTxPower(Region::US, 0));
+  TEST_ASSERT_EQUAL_INT8(13, effectiveTxPower(Region::JP, 22));      // JP limit 13
 }
 
 // Semtech SX126x time-on-air, SF11 / BW 250 kHz / CR 4/5 / preamble 16 / explicit header / CRC on / LDRO off:

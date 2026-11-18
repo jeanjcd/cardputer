@@ -7,7 +7,7 @@ const uint8_t kDefaultKey[16] = {0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
 namespace {
 // Copied from Meshtastic firmware master src/mesh/RadioInterface.cpp (RDEF name, freq_start, freq_end, duty_cycle,
 // spacing, power_limit). Listed: regions whose LongFast slot lies within 868–923 MHz (the Cap's rated band), then the
-// 863–868 MHz regions marked experimental. 433 MHz, 470–510 MHz, 2.4 GHz and >923 MHz slots (JP, TW, TH) are excluded.
+// experimental ones with a slot in [860, 868) or (923, 925]. 433 MHz, 470–510 MHz and 2.4 GHz regions are excluded.
 const RegionInfo kRegions[] = {
     {Region::ANZ, "ANZ", 915.0f, 928.0f, 100, 0.0f, 30, false},          // LongFast 919.875
     {Region::BR_902, "BR_902", 902.0f, 907.5f, 100, 0.0f, 30, false},    // 903.875
@@ -25,6 +25,10 @@ const RegionInfo kRegions[] = {
     {Region::NZ_865, "NZ_865", 864.0f, 868.0f, 100, 0.0f, 36, true},     // 864.875
     {Region::NP_865, "NP_865", 865.0f, 868.0f, 100, 0.0f, 30, true},     // 867.875
     {Region::KZ_863, "KZ_863", 863.0f, 868.0f, 100, 0.0f, 30, true},     // 866.875
+    // Experimental: just above the Cap's rated 923 MHz.
+    {Region::JP, "JP", 920.5f, 923.5f, 100, 0.0f, 13, true},             // 923.375
+    {Region::TW, "TW", 920.0f, 925.0f, 100, 0.0f, 27, true},             // 923.875
+    {Region::TH, "TH", 920.0f, 925.0f, 10, 0.0f, 27, true},              // 923.875
 };
 constexpr size_t kCount = sizeof kRegions / sizeof kRegions[0];
 

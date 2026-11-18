@@ -56,12 +56,15 @@ Um rádio só escuta uma frequência por vez, então todos os nós precisam esta
 | NZ_865 *(exp)* | 864,875 MHz | 36 dBm | — |
 | NP_865 *(exp)* | 867,875 MHz | 30 dBm | — |
 | KZ_863 *(exp)* | 866,875 MHz | 30 dBm | — |
+| JP *(exp)* | 923,375 MHz | 13 dBm | — |
+| TW *(exp)* | 923,875 MHz | 27 dBm | — |
+| TH *(exp)* | 923,875 MHz | 27 dBm | 10 % |
 
 - Os valores vêm da tabela de regiões do firmware oficial (`RadioInterface.cpp`), com a mesma fórmula de canal.
-- **(exp)** = experimental: a frequência fica abaixo da faixa de 868–923 MHz para a qual o Cap é especificado. O chip SX1262 sintoniza, mas o desempenho pode ser pior.
-- Fora da lista: regiões em 433 MHz e 470–510 MHz (o Cap não cobre), 2,4 GHz, e JP, TW e TH, cujo canal LongFast cai acima de 923 MHz.
+- **(exp)** = experimental: a frequência fica um pouco fora da faixa de 868–923 MHz para a qual o Cap é especificado (entre 860 e 868 MHz ou entre 923 e 925 MHz). O chip SX1262 sintoniza, mas o desempenho pode ser pior.
+- Fora da lista: regiões em 433 MHz e 470–510 MHz (o Cap não cobre) e 2,4 GHz.
 - **Potência efetiva** = o menor valor entre a configuração, o limite da região e 22 dBm (máximo do Cap). A tela Config mostra a efetiva quando ela é menor.
-- **Duty cycle**: em EU_868 (10 %) e UA_868 (1 %), o firmware soma o tempo de transmissão da última hora e segura os envios quando a cota acabaria (360 s ou 36 s por hora). As mensagens esperam na fila, não são descartadas.
+- **Duty cycle**: em EU_868 e TH (10 %) e UA_868 (1 %), o firmware soma o tempo de transmissão da última hora e segura os envios quando a cota acabaria (360 s ou 36 s por hora). As mensagens esperam na fila, não são descartadas.
 
 ## Antena
 

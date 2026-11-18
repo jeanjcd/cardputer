@@ -95,7 +95,7 @@ void test_settings_reject_invalid_blobs() {
   TEST_ASSERT_FALSE(settingsDecode(b, sizeof b - 1, t));
   uint8_t c[kSettingsBlobLen];
   memcpy(c, b, sizeof c); c[0] = 2;  TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // version
-  memcpy(c, b, sizeof c); c[1] = 15; TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // region
+  memcpy(c, b, sizeof c); c[1] = 18; TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // region
   memcpy(c, b, sizeof c); c[2] = 1;  TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // power < 2
   memcpy(c, b, sizeof c); c[2] = 23; TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // power > 22
   memcpy(c, b, sizeof c); c[3] = 1;  TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // custom but empty greeting
@@ -152,7 +152,8 @@ void test_name_and_power_validation() {
   TEST_ASSERT_TRUE(regionFromByte(2, r) && r == Region::US);
   TEST_ASSERT_TRUE(regionFromByte(3, r) && r == Region::EU_868);
   TEST_ASSERT_TRUE(regionFromByte(11, r) && r == Region::IN);
-  TEST_ASSERT_FALSE(regionFromByte(15, r));
+  TEST_ASSERT_TRUE(regionFromByte(17, r) && r == Region::TH);
+  TEST_ASSERT_FALSE(regionFromByte(18, r));
   TEST_ASSERT_FALSE(regionFromByte(255, r));
   TEST_ASSERT_EQUAL_UINT8(0, regionToByte(Region::ANZ));
   TEST_ASSERT_EQUAL_UINT8(1, regionToByte(Region::BR_902));

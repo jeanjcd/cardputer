@@ -3,11 +3,12 @@
 #include <stdint.h>
 
 /// Supported LoRa regions: the Meshtastic regions whose LongFast slot falls inside the Cap LoRa-1262 rated band
-/// (868–923 MHz), plus the 863–868 MHz regions flagged experimental (outside the Cap's rating; the SX1262 tunes them).
+/// (868–923 MHz), plus regions flagged experimental whose slot is in [860, 868) or (923, 925] MHz (outside the Cap's
+/// rating; the SX1262 tunes them).
 /// The numeric value is the persisted region id (0 = ANZ and 1 = BR_902 match the earlier builds).
 enum class Region : uint8_t {
   ANZ = 0, BR_902 = 1, US = 2, EU_868 = 3, RU = 4, KR = 5, UA_868 = 6, MY_919 = 7, SG_923 = 8, PH_868 = 9, PH_915 = 10,
-  IN = 11, NZ_865 = 12, NP_865 = 13, KZ_863 = 14
+  IN = 11, NZ_865 = 12, NP_865 = 13, KZ_863 = 14, JP = 15, TW = 16, TH = 17
 };
 
 /// One row of the Meshtastic region table (firmware src/mesh/RadioInterface.cpp, RDEF).
@@ -18,7 +19,7 @@ struct RegionInfo {
   uint8_t dutyCycle;         // percent; 100 = unrestricted
   float spacing;             // MHz between channels
   int8_t powerLimit;         // dBm; 0 = unknown (Meshtastic then uses 17)
-  bool experimental;         // LongFast slot outside the Cap's rated 868–923 MHz (may perform worse)
+  bool experimental;         // LongFast slot in [860,868) or (923,925] MHz, outside the Cap's rating (may perform worse)
 };
 
 /// Default LongFast channel key (AES-128).
