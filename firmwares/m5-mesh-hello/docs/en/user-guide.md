@@ -168,7 +168,7 @@ The radio uses the **effective power** = min(your setting, region limit, 22 dBm)
 
 ### Nome longo / Nome curto (long / short name)
 
-Your node's names as other Meshtastic users see them. Long name: 1–24 bytes. Short name: 1–4 bytes. Only ASCII can be typed on the keyboard. Invalid input shows `Nome longo: 1 a 24 bytes` or `Nome curto: 1 a 4 letras` ("short name: 1 to 4 letters").
+Your node's names as other Meshtastic users see them. Long name: 1–24 bytes. Short name: 1–4 bytes (ASCII letters/digits recommended). Only ASCII can be typed on the keyboard. Invalid input shows `Nome longo: 1 a 24 bytes` or `Nome curto: 1 a 4 letras` ("short name: 1 to 4 letters"; the limit is actually 1–4 bytes).
 
 After you save a name, the device **broadcasts a new NodeInfo** so other nodes learn it. Broadcasts are spaced at least 30 s apart; if the last one was less than 30 s ago, the new one goes out when the 30 s are up. **Your node ID and your key stay the same**: other nodes keep recognising you and can still send you DMs. Only the displayed name changes. Other nodes update the name when they receive the new NodeInfo.
 
@@ -225,7 +225,7 @@ Your own messages start with a state marker followed by `>`. Received messages s
 | `.` | sent | The radio transmitted it. For a DM, the acknowledgement has not arrived (yet). Public channel messages stay `.` because the channel has no acknowledgements. |
 | `v` | acknowledged | The recipient's ACK came back: the DM was delivered and decrypted |
 | `?` | waiting for key | The recipient's public key is unknown. The DM is held until the key arrives (see below). |
-| `x` | failed | The transmission failed (`Falha no TX`), the recipient answered with an error (NAK), or the key was missing at send time |
+| `x` | failed | The transmission failed (`Falha no TX`: the radio reported an error while sending, or was not ready), the recipient answered with an error (NAK), or the key was missing at send time |
 
 **The `?` state.** A DM can only be encrypted with the recipient's public key, which arrives in its NodeInfo. When you send to a node without a key:
 
@@ -290,7 +290,7 @@ A node appears in the list as soon as any decodable frame from it is heard: tele
 | `duty limit` (red) | The region's airtime budget for the last hour is used up, and frames are waiting | Nothing is lost. Frames go out as the budget frees up, within the hour. Config shows `Ar 1h: ...`. Only EU_868, UA_868 and TH have a budget. |
 | `-dBm` | No frame received since boot | See [Why no nodes appear](#why-no-nodes-appear). |
 
-When the radio is not working, attempts to transmit also produce the toast `Falha no TX`.
+When the radio is not working, attempts to transmit also produce the toast `Falha no TX` (the radio is not ready).
 
 ### Toasts (yellow, 2.5 s)
 
@@ -301,15 +301,15 @@ When the radio is not working, attempts to transmit also produce the toast `Falh
 | `ERRO: chave nao gravada!` (at boot) | "Error: key not saved": a new key pair was generated but could not be stored | The key will change at the next boot, and nodes that stored the old key will reject the new one. Check flash/NVS (reinstall). Also shown on Config as `ERRO: chave não gravada na NVS!`. |
 | `ERRO no radio` | "Radio error" while changing region or power | Power-cycle. The radio may not be on the shown frequency. |
 | `Fora da faixa do Cap (exp)` | "Outside the Cap's band (experimental)": you selected an experimental region | Fine if it is your country's region. Expect reduced range. |
-| `Falha no TX` | "TX failed": the radio did not report the end of a transmission | The message is marked `x`. Check the status bar for `SEM CAP LoRa` / `RADIO ERRO` and power-cycle. |
+| `Falha no TX` | "TX failed": the radio reported an error while sending, or the radio is not ready (e.g. Cap not detected) | The message is marked `x`. Check the status bar for `SEM CAP LoRa` / `RADIO ERRO` and power-cycle. |
 | `Texto longo demais` | "Text too long" (more than 199 bytes) | Shorten the message. The keyboard input already stops at 199 bytes. |
 | `Fila de TX cheia` | "TX queue full" (6 frames waiting) when sending to the channel | Wait a few seconds and send again. In duty-cycle regions the budget may be holding frames. |
 | `Fila de mensagens cheia` | "Message queue full": 10 DMs are already waiting (for example several `?` messages) | Wait for keys to arrive or for messages to go out. The DM was not stored. |
 | `Aguardando chave do no` | "Waiting for the node's key": DM stored with `?`, NodeInfo request sent | Wait for the node's NodeInfo. See [the `?` state](#message-markers). |
 | `NodeInfo em Ns` | "NodeInfo in N s": a NodeInfo broadcast was requested within 30 s of the previous one | Nothing. It goes out automatically. |
 | `Potência: 2 a 22 dBm` | "Power: 2 to 22 dBm": invalid value | Type a number from 2 to 22. |
-| `Nome longo: 1 a 24 bytes` | Long name empty or too long | Type 1–24 characters. |
-| `Nome curto: 1 a 4 letras` | Short name empty or too long | Type 1–4 characters. |
+| `Nome longo: 1 a 24 bytes` | Long name empty or too long | Type 1–24 bytes. |
+| `Nome curto: 1 a 4 letras` | "Short name: 1 to 4 letters": empty or too long (the limit is 1–4 bytes) | Type 1–4 bytes (ASCII letters/digits recommended). |
 | `Saudação inválida` | "Invalid greeting" (for example control characters) | Retype it. Save an empty text to restore the default. |
 
 ### Other situations
@@ -340,7 +340,7 @@ The screen uses a built-in 8-bit font (code page 437). Text is converted **only 
 | Item | Limit |
 |---|---|
 | Message text | **199 bytes** (UTF-8; accented letters take 2 bytes, emoji 4) |
-| Long name / short name | 24 bytes / 4 bytes |
+| Long name / short name | 1–24 bytes / 1–4 bytes (ASCII letters/digits recommended) |
 | Greeting | 199 bytes |
 | Messages per conversation | 30 (oldest dropped); 96 in total across all conversations; RAM only |
 | Nodes in the list | 100 (the least recently heard is dropped) |
@@ -370,7 +370,7 @@ On the **Nós** screen: press `A`. The status bar shows `AUTO:ON` or `AUTO:OFF`.
 Config → `Enviar NodeInfo` → `Enter`. It goes out immediately, or after the remaining part of the 30 s limit (toast `NodeInfo em Ns`).
 
 **Can I rename the node?**
-Yes. Config → `Nome longo` (1–24 bytes) and `Nome curto` (1–4 bytes). The new names are saved and announced with a fresh NodeInfo. Your node ID and key do not change, so other nodes still recognise you and can keep sending you DMs.
+Yes. Config → `Nome longo` (1–24 bytes) and `Nome curto` (1–4 bytes, ASCII letters/digits recommended). The new names are saved and announced with a fresh NodeInfo. Your node ID and key do not change, so other nodes still recognise you and can keep sending you DMs.
 
 **Can I use it with my phone or the Meshtastic app?**
 No. Bluetooth and Wi-Fi are off, and the device is configured only from its own keyboard. It can talk over LoRa to phones connected to other Meshtastic nodes.

@@ -67,7 +67,7 @@ Details: [docs/en/hardware.md](docs/en/hardware.md).
    cd bin && sha256sum -c SHA256SUMS
    ```
 2. Copy `bin/M5-Mesh-Hello.bin` to the microSD card and install it with **M5Launcher**. If an older version is installed, remove it first (**PMan → Remove**).
-   (`bin/M5-Mesh-Hello-merged.bin` is a full-flash image for esptool at `0x0`. It replaces M5Launcher.)
+   (`bin/M5-Mesh-Hello-merged.bin` is a full-flash image for esptool at `0x0`. Flashing it **erases M5Launcher and every app installed through it**. Use it only if you do not use M5Launcher.)
 3. Attach the antenna and start the app. On first boot it creates its key pair, announces itself and starts listening.
 4. On **Config**, check the **region** (`Região`): every node must use the same one. The default is ANZ (919.875 MHz).
 5. Wait for nodes to appear on **Nós**, select one, press `Enter` and send the pre-filled greeting. Or press `A` to turn on auto-greet.
