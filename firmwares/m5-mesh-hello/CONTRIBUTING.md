@@ -77,9 +77,18 @@ changed the generator on purpose.
 
 ## Release images
 
-`bin/M5-Mesh-Hello.bin` is `.pio/build/cardputer/firmware.bin`; the merged
-image is built with `esptool merge-bin` (see the README). After updating the
-images, regenerate the checksums:
+`bin/M5-Mesh-Hello.bin` is a copy of `.pio/build/cardputer/firmware.bin`. The
+merged image (full flash image written at `0x0`) is built with esptool, where
+`<framework-arduinoespressif32>` is `~/.platformio/packages/framework-arduinoespressif32`:
+
+```sh
+cp .pio/build/cardputer/firmware.bin bin/M5-Mesh-Hello.bin
+esptool --chip esp32s3 merge-bin -o bin/M5-Mesh-Hello-merged.bin \
+  0x0 .pio/build/cardputer/bootloader.bin 0x8000 .pio/build/cardputer/partitions.bin \
+  0xe000 <framework-arduinoespressif32>/tools/partitions/boot_app0.bin 0x10000 .pio/build/cardputer/firmware.bin
+```
+
+After updating the images, regenerate the checksums:
 
 ```sh
 cd bin && sha256sum *.bin > SHA256SUMS
