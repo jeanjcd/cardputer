@@ -1,0 +1,105 @@
+name: m5-mesh-hello
+
+on:
+  push:
+    paths:
+      - "firmwares/m5-mesh-hello/**"
+      - ".github/workflows/m5-mesh-hello.yml"
+  pull_request:
+    paths:
+      - "firmwares/m5-mesh-hello/**"
+      - ".github/workflows/m5-mesh-hello.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m5-mesh-hello-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLATFORMIO_VERSION: "6.2.0"
+
+defaults:
+  run:
+    working-directory: firmwares/m5-mesh-hello
+
+jobs:
+  native-tests:
+    name: Native tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.platformio
+          key: pio-native-${{ runner.os }}-${{ env.PLATFORMIO_VERSION }}-${{ hashFiles('firmwares/m5-mesh-hello/platformio.ini') }}
+      - name: Install PlatformIO
+        run: python -m pip install "platformio==${PLATFORMIO_VERSION}"
+      - name: Native tests
+        run: pio test -e native
+
+  sanitize-tests:
+    name: Native tests (ASan + UBSan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:strict_string_checks=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.platformio
+          key: pio-native-${{ runner.os }}-${{ env.PLATFORMIO_VERSION }}-${{ hashFiles('firmwares/m5-mesh-hello/platformio.ini') }}
+      - name: Install PlatformIO
+        run: python -m pip install "platformio==${PLATFORMIO_VERSION}"
+      - name: Native tests under sanitizers
+        run: pio test -e native_sanitize
+
+  device-build:
+    name: Device build (cardputer)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.platformio
+          key: pio-device-${{ runner.os }}-${{ env.PLATFORMIO_VERSION }}-${{ hashFiles('firmwares/m5-mesh-hello/platformio.ini') }}
+      - name: Install PlatformIO
+        run: python -m pip install "platformio==${PLATFORMIO_VERSION}"
+      - name: Verify committed release images
+        run: (cd bin && sha256sum -c SHA256SUMS)
+      - name: Build firmware
+        run: pio run -e cardputer
+      - name: Collect artifacts and SHA256SUMS
+        run: |
+          mkdir -p ci-out/release ci-out/build
+          cp bin/*.bin bin/SHA256SUMS ci-out/release/
+          cp .pio/build/cardputer/firmware.bin ci-out/build/
+          (cd ci-out/build && sha256sum firmware.bin > SHA256SUMS)
+          cat ci-out/release/SHA256SUMS ci-out/build/SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: m5-mesh-hello-firmware
+          path: firmwares/m5-mesh-hello/ci-out/
+          if-no-files-found: error
+          retention-days: 30

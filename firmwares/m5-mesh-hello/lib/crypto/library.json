@@ -1,0 +1,8 @@
+{
+  "name": "Crypto",
+  "version": "0.4.0",
+  "description": "Vendored subset of rweather/Crypto 0.4.0 (MIT) for m5-mesh-hello",
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*"
+}

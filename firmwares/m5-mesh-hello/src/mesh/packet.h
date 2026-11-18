@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#pragma once
+#include <stddef.h>
+#include <stdint.h>
+#include "header.h"
+#include "pb.h"
+
+/// Our node identity: node number, X25519 keypair and display names.
+struct Identity {
+  uint32_t nodeNum;
+  uint8_t priv[32], pub[32];
+  char longName[40], shortName[8];
+};
+
+/// Builds a packet id: (rnd << 10) | (call counter & 0x3FF); never 0. Uses a process-wide static counter.
+uint32_t nextPacketId(uint32_t rnd);
+
+/// Builds a broadcast TEXT_MESSAGE_APP frame (channel key, no want_ack); returns frame length or 0.
+size_t buildBroadcastText(const Identity& me, uint32_t id, const char* text, uint8_t* out);
+/// Builds a NODEINFO_APP frame carrying our User and public key (channel key); returns frame length or 0.
+size_t buildNodeInfo(const Identity& me, uint32_t id, uint32_t to, bool wantResponse, uint8_t* out);
+/// Builds a ROUTING ACK frame for ackedId addressed to `to` (channel key); returns frame length or 0.
+size_t buildAck(const Identity& me, uint32_t id, uint32_t to, uint32_t ackedId, uint8_t* out);
+/// Builds a ROUTING error (NAK) frame for requestId with Routing.error_reason = err (channel key); returns length or 0.
+size_t buildRoutingError(const Identity& me, uint32_t id, uint32_t to, uint32_t requestId, uint32_t err, uint8_t* out);
+/// Routing error PKI_UNKNOWN_PUBKEY: we cannot decrypt the sender's PKI packet because we lack its key.
+constexpr uint32_t kRoutingPkiUnknownPubkey = 35;
+/// Builds a PKI-encrypted direct text with want_ack set; returns frame length or 0.
+size_t buildDirectText(const Identity& me, uint32_t id, uint32_t to, const uint8_t peerPub[32],
+                       uint32_t extraNonce, const char* text, uint8_t* out);
+
+/// Kind of a decoded inbound frame.
+enum class InKind { None, Text, NodeInfo, Ack, Other };
+
+/// Decoded inbound frame; only valid fields for `kind` are meaningful.
+struct Inbound {
+  InKind kind;
+  PacketHeader h;
+  bool direct;  // addressed to us (not broadcast)
+  bool pki;     // arrived PKI-encrypted
+  MeshData data;
+  MeshUser user;
+  uint32_t ackedId;
+  uint32_t routingError;  // for Ack: Routing.error_reason (0 = ACK, otherwise a NAK for ackedId)
+};
+
+/// Parses and decrypts a frame; returns true only for Text, NodeInfo or Ack/NAK events (false for anything else or malformed).
+bool parseFrame(const Identity& me, const uint8_t* frame, size_t len,
+                const uint8_t* (*peerPubLookup)(uint32_t nodeNum), Inbound& out);
+
+/// Ring of the last 64 (from,id) pairs for duplicate suppression.
+class DedupCache {
+ public:
+  /// Returns true if (from,id) was already seen; otherwise records it and returns false.
+  bool seen(uint32_t from, uint32_t id);
+  /// True if (from,id) was recorded (does not record).
+  bool contains(uint32_t from, uint32_t id) const;
+  /// Records (from,id) if not already present (oldest entry is overwritten when full).
+  void record(uint32_t from, uint32_t id);
+
+ private:
+  uint32_t from_[64] = {};
+  uint32_t id_[64] = {};
+  uint8_t count_ = 0;
+  uint8_t next_ = 0;
+};
