@@ -129,7 +129,7 @@ void test_user_longname_truncated_utf8() {
 }
 
 void test_user_decode_skips_and_truncates() {
-  // field 4 macaddr (6 bytes), field 2 long name of 30 chars into 40 buf ok; short name 10 chars into 8 buf
+  // field 4 macaddr (6 bytes) is skipped; a 10-char short name is truncated to the 8-byte buffer (7 chars)
   uint8_t in[64]; size_t i = 0;
   in[i++] = 0x22; in[i++] = 6; for (int k = 0; k < 6; k++) in[i++] = 0xEE;
   in[i++] = 0x1A; in[i++] = 10; for (int k = 0; k < 10; k++) in[i++] = 'x';
@@ -153,6 +153,27 @@ void test_routing_ack_roundtrip() {
   TEST_ASSERT_EQUAL_UINT(0, pbEncodeRoutingAck(buf, 1));
 }
 
+void test_routing_absent_is_none() {
+  uint32_t err = 99;
+  TEST_ASSERT_TRUE(pbDecodeRoutingError(nullptr, 0, err));
+  TEST_ASSERT_EQUAL_UINT32(0, err);
+  err = 99;
+  const uint8_t unk[] = {0x78, 0x05, 0x52, 0x02, 1, 2};  // unknown fields only
+  TEST_ASSERT_TRUE(pbDecodeRoutingError(unk, sizeof unk, err));
+  TEST_ASSERT_EQUAL_UINT32(0, err);
+  const uint8_t bad[] = {0x18};
+  TEST_ASSERT_FALSE(pbDecodeRoutingError(bad, sizeof bad, err));
+}
+
+void test_user_bad_key_length_rejected() {
+  uint8_t in[8] = {0x42, 0x03, 1, 2, 3};  // field 8, 3 bytes
+  MeshUser o;
+  TEST_ASSERT_FALSE(pbDecodeUser(in, 5, o));
+  const uint8_t none[] = {0x28, 0x70};
+  TEST_ASSERT_TRUE(pbDecodeUser(none, sizeof none, o));
+  TEST_ASSERT_EQUAL_UINT(0, o.publicKeyLen);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_header_roundtrip);
@@ -165,5 +186,7 @@ int main() {
   RUN_TEST(test_user_longname_truncated_utf8);
   RUN_TEST(test_user_decode_skips_and_truncates);
   RUN_TEST(test_routing_ack_roundtrip);
+  RUN_TEST(test_routing_absent_is_none);
+  RUN_TEST(test_user_bad_key_length_rejected);
   return UNITY_END();
 }

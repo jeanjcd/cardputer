@@ -28,9 +28,9 @@ size_t pbEncodeData(const MeshData& d, uint8_t* out, size_t cap);
 bool pbDecodeData(const uint8_t* in, size_t len, MeshData& d);
 // Encodes User (long name cut to 24 UTF-8 bytes); returns bytes written, or 0 on overflow.
 size_t pbEncodeUser(const MeshUser& u, uint8_t* out, size_t cap);
-// Decodes User, skipping unknown/deprecated fields; returns false on malformed input.
+// Decodes User, skipping unknown/deprecated fields; returns false on malformed input or a public_key not 32 bytes.
 bool pbDecodeUser(const uint8_t* in, size_t len, MeshUser& u);
 // Encodes Routing with error_reason=NONE (bytes 18 00); returns bytes written, or 0 on overflow.
 size_t pbEncodeRoutingAck(uint8_t* out, size_t cap);
-// Extracts Routing.error_reason (field 3); returns false if malformed or absent.
+// Extracts Routing.error_reason (field 3; absent means NONE=0); returns false only if malformed.
 bool pbDecodeRoutingError(const uint8_t* in, size_t len, uint32_t& err);

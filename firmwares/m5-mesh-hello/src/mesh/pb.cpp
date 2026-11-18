@@ -156,8 +156,8 @@ bool pbDecodeUser(const uint8_t* in, size_t len, MeshUser& u) {
       else if (f == 2) copyStr(u.longName, sizeof u.longName, b, bl);
       else if (f == 3) copyStr(u.shortName, sizeof u.shortName, b, bl);
       else {
-        size_t n = bl < sizeof u.publicKey ? bl : sizeof u.publicKey;
-        memcpy(u.publicKey, b, n); u.publicKeyLen = n;
+        if (bl != sizeof u.publicKey) return false;
+        memcpy(u.publicKey, b, bl); u.publicKeyLen = bl;
       }
     }
     else if (f == 5 && wt == 0) { if (!r.varint(v)) return false; u.hwModel = (uint32_t)v; }
@@ -174,14 +174,14 @@ size_t pbEncodeRoutingAck(uint8_t* out, size_t cap) {
 }
 
 bool pbDecodeRoutingError(const uint8_t* in, size_t len, uint32_t& err) {
+  err = 0;  // absent error_reason (proto3 omits zero enum) means NONE
   Reader r(in, len);
-  bool found = false;
   while (!r.done()) {
     uint64_t key, v;
     if (!r.varint(key)) return false;
     uint32_t f = (uint32_t)(key >> 3), wt = (uint32_t)(key & 7);
-    if (f == 3 && wt == 0) { if (!r.varint(v)) return false; err = (uint32_t)v; found = true; }
+    if (f == 3 && wt == 0) { if (!r.varint(v)) return false; err = (uint32_t)v; }
     else if (!r.skip(wt)) return false;
   }
-  return found;
+  return true;
 }
