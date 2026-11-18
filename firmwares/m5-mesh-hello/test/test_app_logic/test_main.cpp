@@ -76,7 +76,7 @@ void test_settings_defaults_and_roundtrip() {
   TEST_ASSERT_EQUAL_UINT32(kSettingsBlobLen, kv.m["settings"].size());
   TEST_ASSERT_EQUAL_UINT8(1, kv.m["settings"][1]);  // region persisted as explicit byte 1 = BR_902
   Settings t;
-  TEST_ASSERT_TRUE(settingsLoad(kv, t));
+  TEST_ASSERT_TRUE(settingsLoad(kv, t) == SettingsLoad::Ok);
   TEST_ASSERT_TRUE(t.region == Region::BR_902);
   TEST_ASSERT_EQUAL_INT8(10, t.txPower);
   TEST_ASSERT_TRUE(t.customGreeting);
@@ -109,10 +109,10 @@ void test_settings_reject_invalid_blobs() {
   TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));
   memcpy(c, b, sizeof c); c[4 + 201 + 25] = (char)0xC3; c[4 + 201 + 26] = 0;  // truncated UTF-8 short name
   TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));
-  // corrupt stored blob loads as defaults
+  // corrupt stored blob loads as defaults (its valid region byte is kept)
   FakeKv kv; kv.m["settings"] = std::vector<uint8_t>(c, c + sizeof c);
   Settings l; l.txPower = 5;
-  TEST_ASSERT_FALSE(settingsLoad(kv, l));
+  TEST_ASSERT_TRUE(settingsLoad(kv, l) == SettingsLoad::Recovered);
   TEST_ASSERT_EQUAL_INT8(22, l.txPower);
   TEST_ASSERT_EQUAL_STRING("4stro-031", l.longName);
 }
@@ -120,11 +120,59 @@ void test_settings_reject_invalid_blobs() {
 void test_settings_legacy_region_key() {
   FakeKv kv; kv.m["region"] = {1};
   Settings s;
-  TEST_ASSERT_FALSE(settingsLoad(kv, s));
+  TEST_ASSERT_TRUE(settingsLoad(kv, s) == SettingsLoad::Recovered);
   TEST_ASSERT_TRUE(s.region == Region::BR_902);
   kv.m["region"] = {99};
-  TEST_ASSERT_FALSE(settingsLoad(kv, s));
+  TEST_ASSERT_TRUE(settingsLoad(kv, s) == SettingsLoad::FirstBoot);
   TEST_ASSERT_TRUE(s.region == Region::ANZ);
+}
+
+// First boot must not transmit before the user confirms a region; a damaged blob keeps a valid region.
+void test_settings_first_boot_decision() {
+  Settings s;
+  {  // empty NVS: first boot, ANZ preselected, prompt required
+    FakeKv kv;
+    SettingsLoad r = settingsLoad(kv, s);
+    TEST_ASSERT_TRUE(r == SettingsLoad::FirstBoot);
+    TEST_ASSERT_TRUE(settingsNeedRegionPrompt(r));
+    TEST_ASSERT_TRUE(s.region == Region::ANZ);
+    TEST_ASSERT_EQUAL_INT8(22, s.txPower);
+  }
+  Settings br; settingsDefaults(br); br.region = Region::BR_902; br.txPower = 10;
+  uint8_t b[kSettingsBlobLen];
+  settingsEncode(br, b);
+  {  // valid blob: no prompt
+    FakeKv kv; kv.m["settings"] = std::vector<uint8_t>(b, b + sizeof b);
+    SettingsLoad r = settingsLoad(kv, s);
+    TEST_ASSERT_TRUE(r == SettingsLoad::Ok);
+    TEST_ASSERT_FALSE(settingsNeedRegionPrompt(r));
+    TEST_ASSERT_TRUE(s.region == Region::BR_902);
+  }
+  {  // invalid power, valid region byte: region kept, other fields default, no prompt
+    uint8_t c[kSettingsBlobLen]; memcpy(c, b, sizeof c); c[2] = 40;
+    FakeKv kv; kv.m["settings"] = std::vector<uint8_t>(c, c + sizeof c);
+    SettingsLoad r = settingsLoad(kv, s);
+    TEST_ASSERT_TRUE(r == SettingsLoad::Recovered);
+    TEST_ASSERT_FALSE(settingsNeedRegionPrompt(r));
+    TEST_ASSERT_TRUE(s.region == Region::BR_902);
+    TEST_ASSERT_EQUAL_INT8(22, s.txPower);
+  }
+  {  // unknown region byte: prompt again
+    uint8_t c[kSettingsBlobLen]; memcpy(c, b, sizeof c); c[1] = 200;
+    FakeKv kv; kv.m["settings"] = std::vector<uint8_t>(c, c + sizeof c);
+    SettingsLoad r = settingsLoad(kv, s);
+    TEST_ASSERT_TRUE(r == SettingsLoad::FirstBoot);
+    TEST_ASSERT_TRUE(s.region == Region::ANZ);
+  }
+  {  // unknown layout version: its region byte is not trusted
+    uint8_t c[kSettingsBlobLen]; memcpy(c, b, sizeof c); c[0] = 9;
+    FakeKv kv; kv.m["settings"] = std::vector<uint8_t>(c, c + sizeof c);
+    TEST_ASSERT_TRUE(settingsLoad(kv, s) == SettingsLoad::FirstBoot);
+  }
+  {  // wrong-size blob counts as absent
+    FakeKv kv; kv.m["settings"] = std::vector<uint8_t>(b, b + 10);
+    TEST_ASSERT_TRUE(settingsLoad(kv, s) == SettingsLoad::FirstBoot);
+  }
 }
 
 void test_name_and_power_validation() {
@@ -268,6 +316,31 @@ void test_reply_limiter_global_interval() {
   TEST_ASSERT_TRUE(r.allow(4, 200000));
 }
 
+void test_reack_limit() {
+  AckMemory a;
+  TEST_ASSERT_FALSE(a.allowReAck(5, 100));  // never ACKed
+  a.record(5, 100);
+  TEST_ASSERT_TRUE(a.allowReAck(5, 100));
+  TEST_ASSERT_TRUE(a.allowReAck(5, 100));
+  TEST_ASSERT_FALSE(a.allowReAck(5, 100));  // at most 2 re-ACKs per (from, id)
+  a.record(5, 100);                         // re-recording does not reset the count
+  TEST_ASSERT_FALSE(a.allowReAck(5, 100));
+  TEST_ASSERT_FALSE(a.allowReAck(6, 100));  // different sender
+  a.record(7, 0);
+  TEST_ASSERT_FALSE(a.allowReAck(7, 0));    // id 0 never recorded
+  for (uint32_t i = 1; i <= AckMemory::kSlots; i++) a.record(9, i);  // ring replaces (5,100)
+  TEST_ASSERT_FALSE(a.allowReAck(5, 100));
+  TEST_ASSERT_TRUE(a.allowReAck(9, 1));
+}
+
+void test_tx_policy() {
+  TEST_ASSERT_TRUE(txMayTransmit(true, false, true, true));
+  TEST_ASSERT_FALSE(txMayTransmit(false, false, true, true));  // first boot: region not confirmed yet
+  TEST_ASSERT_FALSE(txMayTransmit(true, true, true, true));    // region change pending
+  TEST_ASSERT_FALSE(txMayTransmit(true, false, false, true));  // radio failed
+  TEST_ASSERT_FALSE(txMayTransmit(true, false, true, false));  // Cap missing
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_default_greeting_exact_utf8);
@@ -275,11 +348,14 @@ int main() {
   RUN_TEST(test_settings_defaults_and_roundtrip);
   RUN_TEST(test_settings_reject_invalid_blobs);
   RUN_TEST(test_settings_legacy_region_key);
+  RUN_TEST(test_settings_first_boot_decision);
   RUN_TEST(test_name_and_power_validation);
   RUN_TEST(test_cp437_display_conversion);
   RUN_TEST(test_text_editing_helpers);
   RUN_TEST(test_hw_model_names);
   RUN_TEST(test_rate_limiter);
   RUN_TEST(test_reply_limiter_global_interval);
+  RUN_TEST(test_reack_limit);
+  RUN_TEST(test_tx_policy);
   return UNITY_END();
 }

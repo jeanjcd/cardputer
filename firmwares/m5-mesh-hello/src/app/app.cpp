@@ -35,17 +35,20 @@ void App::begin() {
   for (size_t i = 0; i < sizeof seed; i++) rng_ = (rng_ << 8) | seed[i];
   if (rng_ == 0) rng_ = 0x9E3779B97F4A7C15ULL;
 
-  settingsLoad(kv_, settings_);
+  regionPrompt_ = settingsNeedRegionPrompt(settingsLoad(kv_, settings_));
   utf8Copy(me_.longName, sizeof me_.longName, settings_.longName);
   utf8Copy(me_.shortName, sizeof me_.shortName, settings_.shortName);
 
   db_.load();
   greeter_.load();  // auto-greet stays off at every boot
 
-  radio_.begin(freqMHz(), effectivePower());
-  niPending_ = true;  // boot announcement asks neighbours for their NodeInfo
-  niWantResponse_ = true;
+  radio_.begin(freqMHz(), effectivePower());  // RX only until a region is confirmed (see txHeld)
+  if (!regionPrompt_) {
+    niPending_ = true;  // boot announcement asks neighbours for their NodeInfo
+    niWantResponse_ = true;
+  }
   if (idStatus_ == IdentityStatus::CreatedNotSaved) showToast("ERRO: chave nao gravada!", millis());
+  else if (idStatus_ == IdentityStatus::Created) showToast("Nova chave gerada", millis());
   changed();
 }
 
@@ -93,6 +96,7 @@ void App::tick(uint32_t nowMs) {
   float snr = 0;
   if (radio_.poll(buf, len, rssi, snr)) handleFrame(buf, len, rssi, snr, nowMs);
   if (settingsDirty_ && (uint32_t)(nowMs - settingsDirtyMs_) >= 2000) flushSettings(nowMs);
+  serviceHeld(nowMs);
   schedule(nowMs);
   transmitOne(nowMs);
 }
@@ -107,9 +111,7 @@ void App::handleFrame(const uint8_t* buf, size_t len, int16_t rssi, float snr, u
   if (!headerParse(buf, len, h) || h.from == me_.nodeNum || h.from == kBroadcast) return;
   if (dedup_.contains(h.from, h.id)) {
     // Retransmission of a DM we already ACKed: our ACK was probably lost, send it again.
-    if (h.to == me_.nodeNum && h.wantAck)
-      for (size_t i = 0; i < 8; i++)
-        if (ackFrom_[i] == h.from && ackId_[i] == h.id && h.id != 0) { sendAck(h.from, h.id); break; }
+    if (h.to == me_.nodeNum && h.wantAck && acked_.allowReAck(h.from, h.id)) sendAck(h.from, h.id);
     return;
   }
 
@@ -189,9 +191,7 @@ void App::onText(const Inbound& in) {
     }
     if (in.h.wantAck) {
       sendAck(from, in.h.id);
-      ackFrom_[ackNext_] = from;
-      ackId_[ackNext_] = in.h.id;
-      ackNext_ = (uint8_t)((ackNext_ + 1) & 7);
+      acked_.record(from, in.h.id);
     }
     persistPeerOnce(from);
   } else if (in.h.to == kBroadcast) {
@@ -243,7 +243,12 @@ void App::persistPeerOnce(uint32_t num) {
 
 // ---------------------------------------------------------------- transmit
 
+bool App::txHeld() const {
+  return !txMayTransmit(!regionPrompt_, settingsDirty_, radio_.ready(), radio_.capFound());
+}
+
 bool App::enqueue(const uint8_t* frame, size_t len, uint32_t msgId, bool urgent) {
+  if (regionPrompt_) return false;  // first boot: no region confirmed, so nothing may even be queued for TX
   if (len == 0 || len > Radio::kMaxFrame || txCount_ >= kTxQueue) return false;
   size_t slot;
   if (urgent) {
@@ -269,6 +274,18 @@ void App::sendNodeInfoTo(uint32_t to, bool wantResponse) {
   uint8_t f[Radio::kMaxFrame + 1];
   size_t n = buildNodeInfo(me_, newPacketId(), to, wantResponse, f);
   if (n) enqueue(f, n, 0, false);
+}
+
+// Held DMs (waiting for the peer's key): expire after 10 min (marked failed) and, meanwhile, re-ask each such node
+// for its NodeInfo at most once per kNodeInfoRequestMs.
+void App::serviceHeld(uint32_t nowMs) {
+  uint32_t id;
+  while (outbox_.expireOne(nowMs, &id)) setMsgState(id, ChatMsg::WaitingKey, ChatMsg::WaitingKey, ChatMsg::Failed);
+  if (txHeld() || txCount_ >= kTxQueue) return;
+  uint32_t peers[Outbox::kMax];
+  size_t n = outbox_.heldPeers(peers, Outbox::kMax);
+  for (size_t i = 0; i < n && txCount_ < kTxQueue; i++)
+    if (niRequests_.allow(peers[i], nowMs, kNodeInfoRequestMs)) sendNodeInfoTo(peers[i], true);
 }
 
 void App::schedule(uint32_t nowMs) {
@@ -326,6 +343,9 @@ void App::transmitOne(uint32_t nowMs) {
     if (dutyLimited_) { dutyLimited_ = false; changed(); }
     return;
   }
+  // No region confirmed, region being changed, or no working radio/Cap: keep frames queued (no airtime charged, DMs
+  // not failed); the status bar shows the reason.
+  if (txHeld()) return;
   if (haveTx_ && (uint32_t)(nowMs - lastTxEndMs_) < kTxGapMs) return;
   TxItem& t = txq_[txHead_];
   uint32_t airMs = (longFastAirtimeUs(t.len) + 999) / 1000;
@@ -405,10 +425,12 @@ bool App::sendText(uint32_t peer, const char* text, uint32_t nowMs) {
   item.to = peer;
   utf8Copy(item.text, sizeof item.text, text);
   item.chatId = newPacketId();
-  if (!outbox_.queueDirect(item, keyKnown)) {
+  uint32_t evicted = 0;
+  if (!outbox_.queueDirect(item, keyKnown, nowMs, &evicted)) {
     showToast("Fila de mensagens cheia", nowMs);
     return false;
   }
+  if (evicted) setMsgState(evicted, ChatMsg::WaitingKey, ChatMsg::WaitingKey, ChatMsg::Failed);  // oldest held DM gave way
   m.id = item.chatId;
   m.state = keyKnown ? ChatMsg::Pending : ChatMsg::WaitingKey;
   m.setText(text);
@@ -425,15 +447,35 @@ bool App::sendText(uint32_t peer, const char* text, uint32_t nowMs) {
   return true;
 }
 
-void App::cycleRegion(uint32_t nowMs) {
-  settings_.region = regionNext(settings_.region);
+void App::retune(uint32_t nowMs) {
   bool freqOk = radio_.setFreq(freqMHz());
   bool powerOk = radio_.setPower(effectivePower());  // always re-apply the region's power limit
-  settingsDirty_ = true;  // debounced: cycling through regions does not write NVS on every Enter
-  settingsDirtyMs_ = nowMs;
   changed();
   if (!freqOk || !powerOk) showToast("ERRO no radio", nowMs);
   else if (regionInfo(settings_.region).experimental) showToast("Fora da faixa do Cap (exp)", nowMs);
+}
+
+void App::cycleRegion(uint32_t nowMs) {
+  if (regionPrompt_) return;
+  settings_.region = regionNext(settings_.region);
+  settingsDirty_ = true;  // debounced: no NVS write on every Enter, and TX is held until the region settles
+  settingsDirtyMs_ = nowMs;
+  retune(nowMs);
+}
+
+void App::stepPromptRegion(int dir, uint32_t nowMs) {
+  if (!regionPrompt_) return;
+  settings_.region = dir < 0 ? regionPrev(settings_.region) : regionNext(settings_.region);
+  retune(nowMs);  // RX only: enqueue() refuses everything while the prompt is open
+}
+
+void App::confirmPromptRegion(uint32_t nowMs) {
+  if (!regionPrompt_) return;
+  regionPrompt_ = false;
+  saveSettings(nowMs);  // a failed save is shown; the prompt returns on the next boot
+  niPending_ = true;    // boot announcement, now on the confirmed region
+  niWantResponse_ = true;
+  changed();
 }
 
 void App::flushSettings(uint32_t nowMs) {

@@ -110,6 +110,11 @@ void Ui::render(uint32_t nowMs) {
 void Ui::draw(uint32_t nowMs) {
   g->fillScreen(kBg);
   drawStatus(nowMs);
+  if (app_.regionPrompt()) {
+    drawRegionPrompt();
+    if (useCanvas) canvas.pushSprite(0, 0);
+    return;
+  }
   drawTabs();
   switch (tab_) {
     case Nodes: drawNodes(nowMs); break;
@@ -352,7 +357,30 @@ void Ui::drawConfig() {
   }
 }
 
+// First boot: nothing is transmitted until the user confirms the region (ANZ preselected).
+void Ui::drawRegionPrompt() {
+  const RegionInfo& r = regionInfo(app_.settings().region);
+  text(0, kContentY, "Primeiro uso: escolha a sua regi\xC3\xA3o", TFT_YELLOW, kBg, kCols);
+  text(0, kContentY + kLineH, "(nada \xC3\xA9 transmitido at\xC3\xA9 confirmar)", TFT_LIGHTGREY, kBg, kCols);
+  char line[48];
+  snprintf(line, sizeof line, "< %s  %.3f MHz >", r.name, app_.freqMHz());
+  g->fillRect(0, kContentY + 3 * kLineH - 1, kW, kLineH, kSel);
+  text(6 * kCharW, kContentY + 3 * kLineH, line, TFT_WHITE, kSel, kCols - 6);
+  if (r.experimental)
+    text(0, kContentY + 5 * kLineH, "! Fora de 868-923 MHz do Cap (exp)", TFT_ORANGE, kBg, kCols);
+  text(0, kContentY + 6 * kLineH, "Use a regi\xC3\xA3o legal no seu pa\xC3\xADs.", TFT_LIGHTGREY, kBg, kCols);
+  text(0, kInputY, ";/. muda  Enter confirma", TFT_DARKGREY, kBg, kCols);
+}
+
 // ---------------------------------------------------------------- keys
+
+void Ui::keysRegionPrompt(const char* chars, size_t n, bool enter, uint32_t nowMs) {
+  for (size_t i = 0; i < n; i++) {
+    if (chars[i] == ';') app_.stepPromptRegion(-1, nowMs);
+    else if (chars[i] == '.') app_.stepPromptRegion(1, nowMs);
+  }
+  if (enter) app_.confirmPromptRegion(nowMs);
+}
 
 void Ui::setTab(Tab t) {
   if (tab_ == Config && t != Config) app_.flushSettings(millis());
@@ -381,6 +409,10 @@ void Ui::handleKeys(uint32_t nowMs) {
   for (char c : ks.word)
     if (n < sizeof chars) chars[n++] = c;
 
+  if (app_.regionPrompt()) {  // modal until confirmed
+    keysRegionPrompt(chars, n, ks.enter, nowMs);
+    return;
+  }
   if (ks.tab) {
     setTab((Tab)((tab_ + 1) % kTabs));
     return;

@@ -73,13 +73,17 @@ bool settingsDecode(const uint8_t* in, size_t len, Settings& s) {
   return true;
 }
 
-bool settingsLoad(Kv& kv, Settings& s) {
+SettingsLoad settingsLoad(Kv& kv, Settings& s) {
   uint8_t b[kSettingsBlobLen];
-  if (kv.get("settings", b, sizeof b) && settingsDecode(b, sizeof b, s)) return true;
+  bool haveBlob = kv.get("settings", b, sizeof b);
+  if (haveBlob && settingsDecode(b, sizeof b, s)) return SettingsLoad::Ok;
   settingsDefaults(s);
+  // A damaged blob keeps the region the user chose, if that byte is still valid (same layout version only).
+  if (haveBlob && b[0] == kVer && regionFromByte(b[1], s.region)) return SettingsLoad::Recovered;
   uint8_t r = 0;  // the diagnostic build stored the region alone
-  if (kv.get("region", &r, 1)) regionFromByte(r, s.region);
-  return false;
+  if (kv.get("region", &r, 1) && regionFromByte(r, s.region)) return SettingsLoad::Recovered;
+  s.region = Region::ANZ;  // preselected in the first-boot prompt; nothing is sent until it is confirmed
+  return SettingsLoad::FirstBoot;
 }
 
 bool settingsSave(Kv& kv, const Settings& s) {

@@ -36,6 +36,8 @@ const RegionInfo& regionInfo(Region r);
 bool regionFromId(uint8_t id, Region& out);
 /// The region after r in table order (wraps around).
 Region regionNext(Region r);
+/// The region before r in table order (wraps around).
+Region regionPrev(Region r);
 
 /// DJB2 hash of a C string (Meshtastic channel-to-slot hash).
 uint32_t djb2(const char* s);

@@ -52,6 +52,8 @@ bool regionFromId(uint8_t id, Region& out) {
 
 Region regionNext(Region r) { return kRegions[(indexOf(r) + 1) % kCount].id; }
 
+Region regionPrev(Region r) { return kRegions[(indexOf(r) + kCount - 1) % kCount].id; }
+
 uint32_t djb2(const char* s) {
   uint32_t h = 5381;
   while (*s) h = ((h << 5) + h) + (uint8_t)*s++;

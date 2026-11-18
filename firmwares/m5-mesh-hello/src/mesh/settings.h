@@ -7,7 +7,7 @@
 
 /// User settings persisted in Kv under "settings" as a fixed 235-byte blob:
 /// [ver=1][region id u8 (Region value: 0=ANZ 1=BR_902 2=US ...)][txPower i8][flags u8: bit0 custom greeting][greeting 201][longName 25][shortName 5].
-/// Strings are NUL-padded UTF-8. A blob with a wrong size, version or any invalid field loads as defaults.
+/// Strings are NUL-padded UTF-8. A blob with a wrong size, version or any invalid field loads as defaults (see settingsLoad).
 struct Settings {
   static constexpr size_t kMaxGreeting = 199;  // bytes: ChatMsg/OutItem hold 199 bytes of text plus NUL
   static constexpr size_t kMaxLongName = 24;   // bytes
@@ -31,8 +31,17 @@ void settingsDefaults(Settings& s);
 void settingsEncode(const Settings& s, uint8_t out[kSettingsBlobLen]);
 /// Parses and validates a blob; returns false (s untouched) if anything is invalid.
 bool settingsDecode(const uint8_t* in, size_t len, Settings& s);
-/// Loads settings from Kv (key "settings"); falls back to defaults plus a legacy 1-byte "region" key. True if a valid blob was read.
-bool settingsLoad(Kv& kv, Settings& s);
+/// Outcome of settingsLoad.
+enum class SettingsLoad : uint8_t {
+  Ok,         // a valid blob was read
+  Recovered,  // blob invalid or absent, but a valid stored region byte was kept (other fields are defaults)
+  FirstBoot   // no usable region stored: defaults (ANZ preselected); the user must confirm a region before any TX
+};
+/// Loads settings from Kv (key "settings"). On a decode failure keeps the blob's region byte if it is valid, else the
+/// legacy 1-byte "region" key if valid; otherwise defaults with FirstBoot.
+SettingsLoad settingsLoad(Kv& kv, Settings& s);
+/// True if TX must stay off until the user confirms a region (first boot).
+inline bool settingsNeedRegionPrompt(SettingsLoad r) { return r == SettingsLoad::FirstBoot; }
 /// Persists settings; returns the Kv result.
 bool settingsSave(Kv& kv, const Settings& s);
 

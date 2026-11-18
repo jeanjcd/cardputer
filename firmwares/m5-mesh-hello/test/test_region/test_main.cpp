@@ -62,6 +62,9 @@ void test_every_region_in_cap_band() {
   Region c = Region::ANZ;
   for (size_t i = 0; i < regionCount(); i++) c = regionNext(c);
   TEST_ASSERT_TRUE(c == Region::ANZ);
+  // regionPrev is the inverse of regionNext and wraps the other way
+  for (size_t i = 0; i < regionCount(); i++) TEST_ASSERT_TRUE(regionPrev(regionNext(regionAt(i).id)) == regionAt(i).id);
+  TEST_ASSERT_TRUE(regionPrev(Region::ANZ) == regionAt(regionCount() - 1).id);
   TEST_ASSERT_EQUAL_STRING("EU_868", regionInfo(Region::EU_868).name);
   TEST_ASSERT_EQUAL_UINT8(10, regionInfo(Region::EU_868).dutyCycle);
 }
