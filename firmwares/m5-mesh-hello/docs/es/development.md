@@ -72,7 +72,7 @@ ASan/UBSan necesitan los runtimes de los sanitizers, que GCC/Clang proporcionan 
 
 ### Verificación de la documentación
 
-`test/test_docs_regions` analiza la tabla entre `<!-- regions:begin -->` y `<!-- regions:end -->` de `docs/en/frequencies.md` y compara cada fila con el código: nombre y orden, límites de banda, frecuencia LongFast, límite de potencia, ciclo de trabajo e indicador de experimental. Si cambias la tabla de regiones en el código, actualiza el documento en el mismo commit. La prueba se ejecuta en la suite `native`, así que la CI falla cuando no coinciden. La prueba busca el archivo relativo a la carpeta del proyecto, con una alternativa relativa a la ruta de su propio código fuente. Solo se comprueba la versión en inglés; las traducciones de `docs/pt-BR/`, `docs/es/` y `docs/ru/` no tienen los marcadores.
+`test/test_docs_regions` analiza la tabla entre `<!-- regions:begin -->` y `<!-- regions:end -->` de `docs/en/frequencies.md` y compara cada fila con el código: nombre y orden, límites de banda, frecuencia LongFast, límite de potencia, ciclo de trabajo e indicador de experimental. Si cambias la tabla de regiones en el código, actualiza el documento en el mismo commit. La prueba se ejecuta en la suite `native`, así que la CI falla cuando no coinciden. La prueba busca el archivo relativo a la carpeta del proyecto, con una alternativa relativa a la ruta de su propio código fuente. Solo se comprueba la versión en inglés; las traducciones de `docs/pt-BR/`, `docs/es/`, `docs/ru/` y `docs/ja/` no tienen los marcadores.
 
 ### Verificación de enlaces
 

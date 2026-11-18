@@ -155,6 +155,8 @@ El firmware incluye regiones cuya frecuencia LongFast está en [860, 868) MHz (I
 
 Usa una región experimental solo si es la región correcta de tu país, y cuenta con un alcance reducido.
 
+**Japón (JP).** Las normas japonesas de la banda de 920 MHz (ARIB STD-T108) pueden exigir detección de portadora (LBT) y límites de tiempo de transmisión; este firmware no implementa LBT y no se ha evaluado su conformidad — comprueba tú mismo los requisitos de 電波法/技適 antes de transmitir en Japón.
+
 ## Brasil
 
 En Brasil hay dos regiones relevantes, y **no** se oyen entre sí:

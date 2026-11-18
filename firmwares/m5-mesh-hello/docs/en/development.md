@@ -68,7 +68,7 @@ ASan/UBSan need the sanitizer runtimes, which GCC/Clang provide on Linux and mac
 
 ### Docs check
 
-`test/test_docs_regions` parses the table between `<!-- regions:begin -->` and `<!-- regions:end -->` in `docs/en/frequencies.md` and compares every row with the code: name and order, band edges, LongFast frequency, power limit, duty cycle and experimental flag. If you change the region table in code, update the doc in the same commit. The test runs in the `native` suite, so CI fails when they disagree. The test looks for the file relative to the project folder, with a fallback relative to its own source path. Only the English file is checked; the translations in `docs/pt-BR/`, `docs/es/` and `docs/ru/` reproduce the table without the markers.
+`test/test_docs_regions` parses the table between `<!-- regions:begin -->` and `<!-- regions:end -->` in `docs/en/frequencies.md` and compares every row with the code: name and order, band edges, LongFast frequency, power limit, duty cycle and experimental flag. If you change the region table in code, update the doc in the same commit. The test runs in the `native` suite, so CI fails when they disagree. The test looks for the file relative to the project folder, with a fallback relative to its own source path. Only the English file is checked; the translations in `docs/pt-BR/`, `docs/es/`, `docs/ru/` and `docs/ja/` reproduce the table without the markers.
 
 ### Link check
 

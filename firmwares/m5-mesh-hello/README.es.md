@@ -1,4 +1,4 @@
-[English](README.md) | [Português](README.pt-BR.md) | **Español** | [Русский](README.ru.md)
+[English](README.md) | [Português](README.pt-BR.md) | **Español** | [Русский](README.ru.md) | [日本語](README.ja.md)
 
 > Traducido del inglés; en caso de duda, prevalece la [versión en inglés](README.md).
 
@@ -78,7 +78,7 @@ Detalles: [docs/es/hardware.md](docs/es/hardware.md).
 
 ## Regiones
 
-La región por defecto es **ANZ** (919.875 MHz), que usa la comunidad Meshtastic de Brasil. La región oficial de Meshtastic para Brasil es BR_902 (903.875 MHz). El firmware también admite US, EU_868, RU, KR, UA_868, MY_919, SG_923, PH_868 y PH_915, además de las experimentales IN, NZ_865, NP_865, KZ_863, JP, TW y TH (un poco fuera de la banda nominal del Cap). **Usa siempre la región del país en el que te encuentras.** La tabla completa, la fórmula de la frecuencia, los límites de potencia y el ciclo de trabajo están en [docs/es/frequencies.md](docs/es/frequencies.md).
+La región por defecto es **ANZ** (919.875 MHz), que usa la comunidad Meshtastic de Brasil. La región oficial de Meshtastic para Brasil es BR_902 (903.875 MHz). El firmware también admite US, EU_868, RU, KR, UA_868, MY_919, SG_923, PH_868 y PH_915, además de las experimentales IN, NZ_865, NP_865, KZ_863, JP, TW y TH (un poco fuera de la banda nominal del Cap). **Usa siempre la región del país en el que te encuentras.** En Japón (JP), las normas de la banda de 920 MHz (ARIB STD-T108) pueden exigir detección de portadora (LBT) y límites de tiempo de transmisión; este firmware no implementa LBT y no se ha evaluado su conformidad — comprueba tú mismo los requisitos de 電波法/技適 antes de transmitir en Japón. La tabla completa, la fórmula de la frecuencia, los límites de potencia y el ciclo de trabajo están en [docs/es/frequencies.md](docs/es/frequencies.md).
 
 ## Documentación
 
