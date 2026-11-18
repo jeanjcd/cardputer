@@ -41,5 +41,24 @@ First public release.
   contribution guide, CI (tests, sanitizers, device build, checksums), CodeQL
   and Dependabot configuration.
 
+### Security and safety
+
+- First boot transmits nothing until the user confirms a region (ANZ
+  preselected; `;`/`.` to change, `Enter` to confirm). A damaged settings blob
+  keeps its region if that byte is still valid; with no valid region the prompt
+  appears again.
+- Persisted peer keys are pinned in a RAM table: `pubKey()` falls back to the
+  pin and `applyUser()` rejects any other key, so flooding the 100-node table
+  cannot replace a saved peer's key. Eviction drops keyless, non-saved nodes
+  first.
+- DMs held for a missing key expire after 10 minutes (marked `x`); a DM to a
+  keyed node evicts the oldest held DM when the 10-DM outbox is full; the
+  NodeInfo request is repeated at most once per 60 s while a DM is held.
+- Frames stay queued (no airtime charged, DMs not failed) while the Cap or
+  radio is not working and while a region change is pending.
+- At most 2 re-ACKs per received DM `(from, id)`.
+- Toast `Nova chave gerada` when a new key pair is created and saved.
+- CodeQL results are uploaded to the repository's Security tab.
+
 [Unreleased]: https://github.com/jeanjcd/cardputer/compare/m5-mesh-hello-v0.1.0...HEAD
 [0.1.0]: https://github.com/jeanjcd/cardputer/releases/tag/m5-mesh-hello-v0.1.0
