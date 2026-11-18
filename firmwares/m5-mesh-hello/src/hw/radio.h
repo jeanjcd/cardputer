@@ -9,7 +9,8 @@ class Radio {
 
   /// Enables the antenna switch (PI4IOE5V6408 P0), initialises the SX1262 and starts RX. Call after M5Cardputer.begin().
   bool begin(float freqMHz, int8_t powerDbm);
-  /// Non-blocking: if a packet arrived, copies it into buf (capacity passed in `len`, length returned in `len`) with RSSI/SNR.
+  /// Non-blocking: if a packet arrived (IRQ flag or DIO1 high), copies it into buf (capacity passed in `len`, length
+  /// returned in `len`) with RSSI/SNR. Re-arms RX if nothing was received or sent for 10 minutes.
   bool poll(uint8_t* buf, size_t& len, int16_t& rssi, float& snr);
   /// Blocking transmit of 1..255 bytes, then back to RX; returns true if the radio reported TX done.
   bool send(const uint8_t* buf, size_t len);
@@ -20,7 +21,7 @@ class Radio {
 
   /// True if the radio initialised successfully.
   bool ready() const { return ready_; }
-  /// True if the Cap's IO expander answered and the antenna switch was enabled.
+  /// True if the Cap's IO expander answered and the antenna switch output was configured and reads back HIGH.
   bool capFound() const { return capFound_; }
   /// Number of received packets dropped for a CRC/header error.
   uint32_t crcErrors() const { return crcErrors_; }
@@ -28,7 +29,9 @@ class Radio {
   int16_t lastError() const { return lastError_; }
 
  private:
+  void markActivity();
   bool ready_ = false;
+  uint32_t lastActivityMs_ = 0;
   bool capFound_ = false;
   uint32_t crcErrors_ = 0;
   int16_t lastError_ = 0;

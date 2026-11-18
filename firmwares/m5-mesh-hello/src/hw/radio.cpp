@@ -24,6 +24,7 @@ constexpr uint16_t kPreamble = 16;
 constexpr float kTcxoV = 3.0f;
 constexpr float kCurrentLimitMa = 140.0f;
 constexpr int8_t kMinPower = 2, kMaxPower = 22;
+constexpr uint32_t kRxRearmMs = 10UL * 60UL * 1000UL;  // re-arm RX after 10 min without RX/TX
 
 SPIClass loraSpi(FSPI);  // the display uses SPI3; the LoRa/SD bus gets SPI2
 Module* gModule = nullptr;
@@ -43,12 +44,10 @@ bool Radio::begin(float freqMHz, int8_t powerDbm) {
 
   // Antenna RF switch on the internal I2C IO expander (shared with keyboard and IMU).
   static m5::PI4IOE5V6408_Class ioe(kIoeAddr, 400000, &m5::In_I2C);
-  capFound_ = ioe.begin();
-  if (capFound_) {
-    ioe.setDirection(kIoeAntennaPin, true);
-    ioe.setHighImpedance(kIoeAntennaPin, false);
-    ioe.digitalWrite(kIoeAntennaPin, true);
-  }
+  // The Cap counts as found only if every step succeeded and the output register reads back HIGH.
+  capFound_ = ioe.begin() && ioe.setDirection(kIoeAntennaPin, true) &&
+              ioe.setHighImpedance(kIoeAntennaPin, false) && ioe.digitalWrite(kIoeAntennaPin, true) &&
+              ioe.getWriteValue(kIoeAntennaPin);
 
   loraSpi.begin(kPinSck, kPinMiso, kPinMosi, kPinNss);
   if (!gModule) gModule = new Module(kPinNss, kPinDio1, kPinRst, kPinBusy, loraSpi);
@@ -68,14 +67,27 @@ bool Radio::begin(float freqMHz, int8_t powerDbm) {
   st = gLora->startReceive();
   lastError_ = st;
   ready_ = (st == RADIOLIB_ERR_NONE);
+  markActivity();
   return ready_;
 }
+
+void Radio::markActivity() { lastActivityMs_ = millis(); }
 
 bool Radio::poll(uint8_t* buf, size_t& len, int16_t& rssi, float& snr) {
   size_t cap = len;
   len = 0;
-  if (!ready_ || !gIrqFlag) return false;
+  if (!ready_) return false;
+  // DIO1 stays high while an IRQ is pending, which also catches an edge missed by the interrupt.
+  if (!gIrqFlag && digitalRead(kPinDio1) != HIGH) {
+    if ((uint32_t)(millis() - lastActivityMs_) >= kRxRearmMs) {
+      int16_t st = gLora->startReceive();
+      if (st != RADIOLIB_ERR_NONE) lastError_ = st;
+      markActivity();
+    }
+    return false;
+  }
   gIrqFlag = false;
+  markActivity();
 
   bool ok = false;
   size_t n = gLora->getPacketLength();
@@ -108,6 +120,7 @@ bool Radio::send(const uint8_t* buf, size_t len) {
   if (st != RADIOLIB_ERR_NONE) lastError_ = st;
   int16_t rx = gLora->startReceive();
   if (rx != RADIOLIB_ERR_NONE) lastError_ = rx;
+  markActivity();
   return st == RADIOLIB_ERR_NONE;
 }
 

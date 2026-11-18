@@ -13,29 +13,21 @@ static_assert(kOffShort + kLenShort == kSettingsBlobLen, "settings layout");
 constexpr const char* kGreetPrefix = "Sauda\xC3\xA7\xC3\xB5" "es de ";
 constexpr const char* kGreetSuffix = "! \xF0\x9F\x91\x8B (Cardputer-Adv)";
 
-// Reads a NUL-padded string field; false if no NUL inside the field.
-bool readField(const uint8_t* in, size_t len, char* out) {
-  if (memchr(in, 0, len) == nullptr) return false;
-  memcpy(out, in, len);
+// Reads a NUL-padded string field of len bytes into out[cap]; false if there is no NUL or the string does not fit.
+bool readField(const uint8_t* in, size_t len, char* out, size_t cap) {
+  const void* nul = memchr(in, 0, len);
+  if (nul == nullptr) return false;
+  size_t n = (size_t)((const uint8_t*)nul - in);
+  if (n + 1 > cap) return false;
+  memset(out, 0, cap);
+  memcpy(out, in, n);
   return true;
 }
 }  // namespace
 
-uint8_t regionToByte(Region r) {
-  switch (r) {
-    case Region::BR_902: return 1;
-    case Region::ANZ:
-    default: return 0;
-  }
-}
+uint8_t regionToByte(Region r) { return (uint8_t)regionInfo(r).id; }
 
-bool regionFromByte(uint8_t b, Region& out) {
-  switch (b) {
-    case 0: out = Region::ANZ; return true;
-    case 1: out = Region::BR_902; return true;
-    default: return false;
-  }
-}
+bool regionFromByte(uint8_t b, Region& out) { return regionFromId(b, out); }
 
 bool validTxPower(int p) { return p >= Settings::kMinPower && p <= Settings::kMaxPower; }
 bool validLongName(const char* s) { return utf8CleanText(s, Settings::kMaxLongName); }
@@ -57,7 +49,7 @@ void settingsEncode(const Settings& s, uint8_t out[kSettingsBlobLen]) {
   out[1] = regionToByte(s.region);
   out[2] = (uint8_t)s.txPower;
   out[3] = s.customGreeting ? 1 : 0;
-  if (s.customGreeting) memcpy(out + kOffGreeting, s.greeting, strnlen(s.greeting, kLenGreeting - 1));
+  if (s.customGreeting) memcpy(out + kOffGreeting, s.greeting, strnlen(s.greeting, sizeof s.greeting - 1));
   memcpy(out + kOffLong, s.longName, strnlen(s.longName, kLenLong - 1));
   memcpy(out + kOffShort, s.shortName, strnlen(s.shortName, kLenShort - 1));
 }
@@ -71,9 +63,9 @@ bool settingsDecode(const uint8_t* in, size_t len, Settings& s) {
   if (!validTxPower(t.txPower)) return false;
   if (in[3] > 1) return false;
   t.customGreeting = in[3] == 1;
-  if (!readField(in + kOffGreeting, kLenGreeting, t.greeting)) return false;
-  if (!readField(in + kOffLong, kLenLong, t.longName)) return false;
-  if (!readField(in + kOffShort, kLenShort, t.shortName)) return false;
+  if (!readField(in + kOffGreeting, kLenGreeting, t.greeting, sizeof t.greeting)) return false;
+  if (!readField(in + kOffLong, kLenLong, t.longName, sizeof t.longName)) return false;
+  if (!readField(in + kOffShort, kLenShort, t.shortName, sizeof t.shortName)) return false;
   if (t.customGreeting ? !validGreeting(t.greeting) : t.greeting[0] != 0) return false;
   if (!validLongName(t.longName) || !validShortName(t.shortName)) return false;
   s = t;

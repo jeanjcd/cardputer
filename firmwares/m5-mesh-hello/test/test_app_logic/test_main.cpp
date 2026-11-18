@@ -95,7 +95,7 @@ void test_settings_reject_invalid_blobs() {
   TEST_ASSERT_FALSE(settingsDecode(b, sizeof b - 1, t));
   uint8_t c[kSettingsBlobLen];
   memcpy(c, b, sizeof c); c[0] = 2;  TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // version
-  memcpy(c, b, sizeof c); c[1] = 2;  TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // region
+  memcpy(c, b, sizeof c); c[1] = 15; TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // region
   memcpy(c, b, sizeof c); c[2] = 1;  TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // power < 2
   memcpy(c, b, sizeof c); c[2] = 23; TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // power > 22
   memcpy(c, b, sizeof c); c[3] = 1;  TEST_ASSERT_FALSE(settingsDecode(c, sizeof c, t));  // custom but empty greeting
@@ -121,7 +121,7 @@ void test_settings_legacy_region_key() {
   Settings s;
   TEST_ASSERT_FALSE(settingsLoad(kv, s));
   TEST_ASSERT_TRUE(s.region == Region::BR_902);
-  kv.m["region"] = {9};
+  kv.m["region"] = {99};
   TEST_ASSERT_FALSE(settingsLoad(kv, s));
   TEST_ASSERT_TRUE(s.region == Region::ANZ);
 }
@@ -142,14 +142,18 @@ void test_name_and_power_validation() {
   TEST_ASSERT_TRUE(validTxPower(22));
   TEST_ASSERT_FALSE(validTxPower(1));
   TEST_ASSERT_FALSE(validTxPower(23));
-  char g[202]; memset(g, 'a', 200); g[200] = 0;
+  char g[202]; memset(g, 'a', 199); g[199] = 0;
   TEST_ASSERT_TRUE(validGreeting(g));
-  g[200] = 'a'; g[201] = 0;
+  g[199] = 'a'; g[200] = 0;
   TEST_ASSERT_FALSE(validGreeting(g));
   Region r;
   TEST_ASSERT_TRUE(regionFromByte(0, r) && r == Region::ANZ);
   TEST_ASSERT_TRUE(regionFromByte(1, r) && r == Region::BR_902);
-  TEST_ASSERT_FALSE(regionFromByte(2, r));
+  TEST_ASSERT_TRUE(regionFromByte(2, r) && r == Region::US);
+  TEST_ASSERT_TRUE(regionFromByte(3, r) && r == Region::EU_868);
+  TEST_ASSERT_TRUE(regionFromByte(11, r) && r == Region::IN);
+  TEST_ASSERT_FALSE(regionFromByte(15, r));
+  TEST_ASSERT_FALSE(regionFromByte(255, r));
   TEST_ASSERT_EQUAL_UINT8(0, regionToByte(Region::ANZ));
   TEST_ASSERT_EQUAL_UINT8(1, regionToByte(Region::BR_902));
 }
