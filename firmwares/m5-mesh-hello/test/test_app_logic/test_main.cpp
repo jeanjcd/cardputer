@@ -254,6 +254,19 @@ void test_rate_limiter() {
   TEST_ASSERT_FALSE(f.allow(102, 102, P));    // still remembered
 }
 
+void test_reply_limiter_global_interval() {
+  ReplyLimiter r(12u * 3600u * 1000u, 30000);
+  TEST_ASSERT_TRUE(r.allow(1, 1000));
+  // spoofed / different senders cannot get more than one reply per 30 s
+  for (uint32_t n = 2; n < 200; n++) TEST_ASSERT_FALSE(r.allow(n, 1000 + n * 100));
+  TEST_ASSERT_TRUE(r.allow(2, 31000));
+  TEST_ASSERT_FALSE(r.allow(3, 60999));
+  TEST_ASSERT_TRUE(r.allow(3, 61000));
+  // the per-node rule still applies after the global interval
+  TEST_ASSERT_FALSE(r.allow(1, 200000));
+  TEST_ASSERT_TRUE(r.allow(4, 200000));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_default_greeting_exact_utf8);
@@ -266,5 +279,6 @@ int main() {
   RUN_TEST(test_text_editing_helpers);
   RUN_TEST(test_hw_model_names);
   RUN_TEST(test_rate_limiter);
+  RUN_TEST(test_reply_limiter_global_interval);
   return UNITY_END();
 }

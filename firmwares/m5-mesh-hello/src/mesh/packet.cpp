@@ -82,10 +82,14 @@ size_t buildNodeInfo(const Identity& me, uint32_t id, uint32_t to, bool wantResp
 }
 
 size_t buildAck(const Identity& me, uint32_t id, uint32_t to, uint32_t ackedId, uint8_t* out) {
+  return buildRoutingError(me, id, to, ackedId, 0, out);
+}
+
+size_t buildRoutingError(const Identity& me, uint32_t id, uint32_t to, uint32_t requestId, uint32_t err, uint8_t* out) {
   MeshData d;
   d.portnum = kPortRouting;
-  d.requestId = ackedId;
-  size_t n = pbEncodeRoutingAck(d.payload, sizeof d.payload);
+  d.requestId = requestId;
+  size_t n = pbEncodeRoutingError(err, d.payload, sizeof d.payload);
   if (n == 0) return 0;
   d.payloadLen = n;
   return finishChannel(me, id, to, false, d, out);
@@ -169,9 +173,16 @@ bool parseFrame(const Identity& me, const uint8_t* frame, size_t len,
   }
 }
 
-bool DedupCache::seen(uint32_t from, uint32_t id) {
+bool DedupCache::contains(uint32_t from, uint32_t id) const {
   for (uint8_t i = 0; i < count_; i++)
     if (from_[i] == from && id_[i] == id) return true;
+  return false;
+}
+
+void DedupCache::record(uint32_t from, uint32_t id) { (void)seen(from, id); }  // seen() records new pairs
+
+bool DedupCache::seen(uint32_t from, uint32_t id) {
+  if (contains(from, id)) return true;
   from_[next_] = from; id_[next_] = id;
   next_ = (uint8_t)((next_ + 1) & 63);
   if (count_ < 64) count_++;

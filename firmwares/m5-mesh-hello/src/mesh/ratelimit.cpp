@@ -17,3 +17,11 @@ bool NodeRateLimiter::allow(uint32_t num, uint32_t nowMs, uint32_t periodMs) {
   at_[slot] = nowMs;
   return true;
 }
+
+bool ReplyLimiter::allow(uint32_t num, uint32_t nowMs) {
+  if (haveLast_ && (uint32_t)(nowMs - last_) < global_) return false;  // checked first: refusals are not recorded
+  if (!nodes_.allow(num, nowMs, perNode_)) return false;
+  haveLast_ = true;
+  last_ = nowMs;
+  return true;
+}

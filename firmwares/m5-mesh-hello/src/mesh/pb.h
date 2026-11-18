@@ -32,5 +32,7 @@ size_t pbEncodeUser(const MeshUser& u, uint8_t* out, size_t cap);
 bool pbDecodeUser(const uint8_t* in, size_t len, MeshUser& u);
 // Encodes Routing with error_reason=NONE (bytes 18 00); returns bytes written, or 0 on overflow.
 size_t pbEncodeRoutingAck(uint8_t* out, size_t cap);
+// Encodes Routing with the given error_reason (field 3); returns bytes written, or 0 on overflow.
+size_t pbEncodeRoutingError(uint32_t err, uint8_t* out, size_t cap);
 // Extracts Routing.error_reason (field 3; absent means NONE=0); returns false only if malformed.
 bool pbDecodeRoutingError(const uint8_t* in, size_t len, uint32_t& err);

@@ -56,8 +56,9 @@ uint32_t loraAirtimeUs(uint8_t sf, uint32_t bwHz, uint8_t crDenom, uint16_t prea
 /// Time-on-air of a LongFast frame (SF11, BW 250 kHz, CR 4/5, preamble 16, explicit header, CRC on, LDRO off).
 uint32_t longFastAirtimeUs(size_t len);
 
-/// Rolling one-hour airtime accounting for duty-cycle-limited regions, in 60 one-minute buckets (conservative:
-/// the window covers the current minute plus the previous 59). Time is a 64-bit millisecond uptime (no wraparound).
+/// Rolling one-hour airtime accounting for duty-cycle-limited regions, in 61 one-minute buckets. A frame sent in
+/// minute M keeps counting through minute M+60, i.e. for at least a full 3600 s (up to 3660 s: conservative).
+/// Time is a 64-bit millisecond uptime (no wraparound).
 class AirtimeBudget {
  public:
   /// Records airMs of transmission at nowMs.
@@ -68,7 +69,7 @@ class AirtimeBudget {
   bool allows(uint64_t nowMs, uint32_t airMs, uint8_t dutyPct) const;
 
  private:
-  static constexpr size_t kBuckets = 60;
+  static constexpr size_t kBuckets = 61;
   uint64_t minute_[kBuckets] = {};
   uint32_t ms_[kBuckets] = {};
   bool used_[kBuckets] = {};

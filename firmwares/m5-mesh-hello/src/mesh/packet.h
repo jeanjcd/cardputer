@@ -20,6 +20,10 @@ size_t buildBroadcastText(const Identity& me, uint32_t id, const char* text, uin
 size_t buildNodeInfo(const Identity& me, uint32_t id, uint32_t to, bool wantResponse, uint8_t* out);
 /// Builds a ROUTING ACK frame for ackedId addressed to `to` (channel key); returns frame length or 0.
 size_t buildAck(const Identity& me, uint32_t id, uint32_t to, uint32_t ackedId, uint8_t* out);
+/// Builds a ROUTING error (NAK) frame for requestId with Routing.error_reason = err (channel key); returns length or 0.
+size_t buildRoutingError(const Identity& me, uint32_t id, uint32_t to, uint32_t requestId, uint32_t err, uint8_t* out);
+/// Routing error PKI_UNKNOWN_PUBKEY: we cannot decrypt the sender's PKI packet because we lack its key.
+constexpr uint32_t kRoutingPkiUnknownPubkey = 35;
 /// Builds a PKI-encrypted direct text with want_ack set; returns frame length or 0.
 size_t buildDirectText(const Identity& me, uint32_t id, uint32_t to, const uint8_t peerPub[32],
                        uint32_t extraNonce, const char* text, uint8_t* out);
@@ -48,6 +52,10 @@ class DedupCache {
  public:
   /// Returns true if (from,id) was already seen; otherwise records it and returns false.
   bool seen(uint32_t from, uint32_t id);
+  /// True if (from,id) was recorded (does not record).
+  bool contains(uint32_t from, uint32_t id) const;
+  /// Records (from,id) if not already present (oldest entry is overwritten when full).
+  void record(uint32_t from, uint32_t id);
 
  private:
   uint32_t from_[64] = {};

@@ -13,7 +13,6 @@ constexpr float kBwKHz = 250.0f;
 constexpr uint32_t kBroadcast = 0xFFFFFFFFu;
 constexpr uint32_t kTxGapMs = 1500;                        // airtime courtesy between our frames
 constexpr uint32_t kNodeInfoPeriodMs = 3UL * 3600 * 1000;  // periodic NodeInfo broadcast
-constexpr uint32_t kNodeInfoReplyMs = 12UL * 3600 * 1000;  // at most one reply per node per 12 h
 constexpr uint32_t kManualNodeInfoMs = 30000;              // manual/rename NodeInfo broadcasts
 constexpr uint32_t kNodeInfoRequestMs = 60000;             // direct NodeInfo requests per node
 constexpr uint32_t kToastMs = 2500;
@@ -78,6 +77,7 @@ const char* App::toast(uint32_t nowMs) const {
 }
 
 bool App::saveSettings(uint32_t nowMs) {
+  settingsDirty_ = false;  // the whole struct is written, including any pending region change
   bool ok = settingsSave(kv_, settings_);
   showToast(ok ? "Config salva" : "ERRO ao gravar config", nowMs);
   return ok;
@@ -91,6 +91,7 @@ void App::tick(uint32_t nowMs) {
   int16_t rssi = 0;
   float snr = 0;
   if (radio_.poll(buf, len, rssi, snr)) handleFrame(buf, len, rssi, snr, nowMs);
+  if (settingsDirty_ && (uint32_t)(nowMs - settingsDirtyMs_) >= 2000) flushSettings(nowMs);
   schedule(nowMs);
   transmitOne(nowMs);
 }
@@ -103,7 +104,7 @@ void App::handleFrame(const uint8_t* buf, size_t len, int16_t rssi, float snr, u
 
   PacketHeader h;
   if (!headerParse(buf, len, h) || h.from == me_.nodeNum || h.from == kBroadcast) return;
-  if (dedup_.seen(h.from, h.id)) {
+  if (dedup_.contains(h.from, h.id)) {
     // Retransmission of a DM we already ACKed: our ACK was probably lost, send it again.
     if (h.to == me_.nodeNum && h.wantAck)
       for (size_t i = 0; i < 8; i++)
@@ -113,7 +114,13 @@ void App::handleFrame(const uint8_t* buf, size_t len, int16_t rssi, float snr, u
 
   static Inbound in;  // large: keep it off the loop task stack (no heap in the RX path)
   bool ok = parseFrame(me_, buf, len, lookupKey, in);
-  if (!ok && in.kind != InKind::Other) return;  // undecodable: not attributed to any node
+  if (!ok && in.kind != InKind::Other) {
+    // Undecodable frames are NOT recorded in the dedup cache, so a retransmission can still be read later
+    // (e.g. a PKI DM that arrived before the sender's key).
+    if (h.channel == 0x00 && h.to == me_.nodeNum && !db_.pubKey(h.from)) onUnknownKeyPki(h, nowMs);
+    return;
+  }
+  dedup_.record(h.from, h.id);  // only frames we fully handled
   db_.touch(h.from, rssi, snr, nowMs);
   if (!ok) return;  // decoded but uninteresting (position, telemetry...): activity only
 
@@ -133,8 +140,19 @@ void App::onNodeInfo(const Inbound& in, uint32_t nowMs) {
     greeter_.onNodeWithKey(from);
     if (!hadKey) keyArrived(from);
   }
-  if (in.data.wantResponse && (in.direct || in.h.to == kBroadcast) && niReplies_.allow(from, nowMs, kNodeInfoReplyMs))
+  // Replies are throttled per node (12 h) and globally (30 s) so spoofed senders cannot keep us on the air.
+  if (in.data.wantResponse && (in.direct || in.h.to == kBroadcast) && niReplies_.allow(from, nowMs))
     sendNodeInfoTo(from, false);
+}
+
+void App::onUnknownKeyPki(const PacketHeader& h, uint32_t nowMs) {
+  // Tell the sender we cannot decrypt (PKI_UNKNOWN_PUBKEY) and send our NodeInfo asking for theirs, so the key
+  // exchange completes and its next retry decrypts. Rate-limited per node (10 min) and globally (30 s).
+  if (!unknownKey_.allow(h.from, nowMs)) return;
+  uint8_t f[Radio::kMaxFrame + 1];
+  size_t n = buildRoutingError(me_, newPacketId(), h.from, h.id, kRoutingPkiUnknownPubkey, f);
+  if (n) enqueue(f, n, 0, true);
+  sendNodeInfoTo(h.from, true);
 }
 
 void App::keyArrived(uint32_t num) {
@@ -214,7 +232,12 @@ void App::persistPeerOnce(uint32_t num) {
     if (persisted_[i] == num) return;
   if (!db_.pubKey(num)) return;
   db_.persistPeer(num);
-  if (persistedCount_ < NodeDb::kMaxPeers) persisted_[persistedCount_++] = num;
+  if (persistedCount_ < NodeDb::kMaxPeers) {
+    persisted_[persistedCount_++] = num;
+  } else {  // full: replace the oldest entry so each peer is written once, not on every message
+    persisted_[persistedNext_] = num;
+    persistedNext_ = (persistedNext_ + 1) % NodeDb::kMaxPeers;
+  }
 }
 
 // ---------------------------------------------------------------- transmit
@@ -403,10 +426,19 @@ bool App::sendText(uint32_t peer, const char* text, uint32_t nowMs) {
 
 void App::cycleRegion(uint32_t nowMs) {
   settings_.region = regionNext(settings_.region);
-  bool ok = radio_.setFreq(freqMHz()) && radio_.setPower(effectivePower());
-  saveSettings(nowMs);
-  if (!ok) showToast("ERRO no radio", nowMs);
+  bool freqOk = radio_.setFreq(freqMHz());
+  bool powerOk = radio_.setPower(effectivePower());  // always re-apply the region's power limit
+  settingsDirty_ = true;  // debounced: cycling through regions does not write NVS on every Enter
+  settingsDirtyMs_ = nowMs;
+  changed();
+  if (!freqOk || !powerOk) showToast("ERRO no radio", nowMs);
   else if (regionInfo(settings_.region).experimental) showToast("Fora da faixa do Cap (exp)", nowMs);
+}
+
+void App::flushSettings(uint32_t nowMs) {
+  if (!settingsDirty_) return;
+  settingsDirty_ = false;
+  saveSettings(nowMs);
 }
 
 bool App::setTxPower(int power, uint32_t nowMs) {

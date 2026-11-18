@@ -74,8 +74,10 @@ class App {
   void toggleAutoGreet();
   /// Sends text (≤200 B) as a DM to `peer`, or to the public channel for kPublic; false (with a toast) if rejected.
   bool sendText(uint32_t peer, const char* text, uint32_t nowMs);
-  /// Switches to the next supported region, retunes, re-applies the power limit and persists.
+  /// Switches to the next supported region, retunes and re-applies the power limit; persisted after 2 s or on flush.
   void cycleRegion(uint32_t nowMs);
+  /// Persists a pending (debounced) settings change now, e.g. when leaving the Config tab.
+  void flushSettings(uint32_t nowMs);
   /// Sets TX power (2..22 dBm); false if out of range.
   bool setTxPower(int power, uint32_t nowMs);
   /// Sets our long name (1..24 B UTF-8) and announces it; false if invalid.
@@ -107,6 +109,7 @@ class App {
   void onNodeInfo(const Inbound& in, uint32_t nowMs);
   void onText(const Inbound& in);
   void onAck(const Inbound& in);
+  void onUnknownKeyPki(const PacketHeader& h, uint32_t nowMs);
   void keyArrived(uint32_t num);
   void persistPeerOnce(uint32_t num);
 
@@ -127,7 +130,8 @@ class App {
   Greeter greeter_{kv_};
   Outbox outbox_;
   DedupCache dedup_;
-  NodeRateLimiter niReplies_;   // NodeInfo replies to want_response (12 h per node)
+  ReplyLimiter niReplies_{12UL * 3600 * 1000, 30000};  // NodeInfo replies: 12 h per node, 30 s globally
+  ReplyLimiter unknownKey_{10UL * 60 * 1000, 30000};   // NAK + NodeInfo to PKI senders we lack a key for
   NodeRateLimiter niRequests_;  // direct NodeInfo requests when DMing a node without key
   AirtimeBudget airtime_;
   bool dutyLimited_ = false;
@@ -145,8 +149,10 @@ class App {
   bool haveNi_ = false, haveManualNi_ = false;
   uint32_t lastNiMs_ = 0, lastManualNiMs_ = 0;
 
-  uint32_t persisted_[NodeDb::kMaxPeers] = {};  // peers already persisted this boot
-  size_t persistedCount_ = 0;
+  uint32_t persisted_[NodeDb::kMaxPeers] = {};  // peers already persisted this boot (ring when full)
+  size_t persistedCount_ = 0, persistedNext_ = 0;
+  bool settingsDirty_ = false;  // debounced save after region changes
+  uint32_t settingsDirtyMs_ = 0;
 
   uint32_t viewing_ = kNone;
   uint8_t publicUnread_ = 0;

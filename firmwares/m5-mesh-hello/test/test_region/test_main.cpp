@@ -115,6 +115,24 @@ void test_airtime_budget() {
   TEST_ASSERT_FALSE(u.allows(t0, 1001, 1));
 }
 
+// A frame must count for at least a full hour: recorded at t0+59 s, it still counts at t0+60 min+1 s and is released
+// only once it is >= 60 min old.
+void test_airtime_budget_full_hour() {
+  AirtimeBudget b;
+  const uint64_t t0 = 5ULL * 3600 * 1000;  // minute-aligned
+  const uint64_t sent = t0 + 59000;
+  b.record(sent, 30000);
+  TEST_ASSERT_EQUAL_UINT32(30000, b.usedMs(t0 + 60ULL * 60000 + 1000));
+  TEST_ASSERT_EQUAL_UINT32(30000, b.usedMs(sent + 60ULL * 60000 - 1));  // 1 ms short of an hour
+  TEST_ASSERT_FALSE(b.allows(sent + 60ULL * 60000 - 1, 6001, 1));        // UA_868: 36 s budget still holds it
+  uint64_t released = 0;
+  for (uint64_t t = sent; t < sent + 2ULL * 3600 * 1000; t += 1000)
+    if (b.usedMs(t) == 0) { released = t; break; }
+  TEST_ASSERT_TRUE(released != 0);
+  TEST_ASSERT_TRUE(released - sent >= 60ULL * 60000);
+  TEST_ASSERT_TRUE(released - sent <= 61ULL * 60000);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_djb2_longfast);
@@ -126,5 +144,6 @@ int main() {
   RUN_TEST(test_effective_power);
   RUN_TEST(test_longfast_airtime);
   RUN_TEST(test_airtime_budget);
+  RUN_TEST(test_airtime_budget_full_hour);
   return UNITY_END();
 }

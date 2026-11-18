@@ -176,6 +176,37 @@ void test_routing_nak_surfaces_error() {
   TEST_ASSERT_FALSE(parseFrame(A, f, n, lookupNone, in));
 }
 
+void test_build_routing_error_roundtrip() {
+  uint8_t f[256]; Inbound in;
+  size_t n = buildRoutingError(B, 0x78, A.nodeNum, 0x4242, kRoutingPkiUnknownPubkey, f);
+  TEST_ASSERT_TRUE(n > 16);
+  TEST_ASSERT_TRUE(parseFrame(A, f, n, lookupNone, in));
+  TEST_ASSERT_TRUE(in.kind == InKind::Ack);
+  TEST_ASSERT_EQUAL_HEX32(0x4242, in.ackedId);
+  TEST_ASSERT_EQUAL_UINT32(35, in.routingError);
+}
+
+// Undecodable frames must not poison the dedup cache: the app checks contains() first and record()s only handled frames.
+void test_dedup_contains_does_not_record() {
+  DedupCache d;
+  TEST_ASSERT_FALSE(d.contains(9, 1));
+  TEST_ASSERT_FALSE(d.contains(9, 1));  // still not recorded
+  // a PKI DM from a sender whose key we lack fails to parse -> not recorded -> its retransmission is processed later
+  uint8_t g[256]; Inbound in;
+  size_t n = buildDirectText(A, 0x5151, B.nodeNum, B.pub, 7, "hi", g);
+  TEST_ASSERT_FALSE(d.contains(A.nodeNum, 0x5151));
+  TEST_ASSERT_FALSE(parseFrame(B, g, n, lookupNone, in));
+  TEST_ASSERT_FALSE(d.contains(A.nodeNum, 0x5151));
+  TEST_ASSERT_TRUE(parseFrame(B, g, n, lookupA, in));  // key arrived: retransmission decrypts
+  d.record(A.nodeNum, 0x5151);
+  TEST_ASSERT_TRUE(d.contains(A.nodeNum, 0x5151));
+  d.record(A.nodeNum, 0x5151);  // idempotent
+  for (uint32_t i = 0; i < 63; i++) d.record(100, i);
+  TEST_ASSERT_TRUE(d.contains(A.nodeNum, 0x5151));  // 64 distinct entries fit
+  d.record(100, 63);
+  TEST_ASSERT_FALSE(d.contains(A.nodeNum, 0x5151));
+}
+
 void test_packet_id_nonzero_and_counter() {
   uint32_t a = nextPacketId(5), b = nextPacketId(5);
   TEST_ASSERT_TRUE(a != 0 && b != 0);
@@ -198,5 +229,7 @@ int main() {
   RUN_TEST(test_legacy_text_dm_rejected);
   RUN_TEST(test_packet_id_nonzero_and_counter);
   RUN_TEST(test_routing_nak_surfaces_error);
+  RUN_TEST(test_build_routing_error_roundtrip);
+  RUN_TEST(test_dedup_contains_does_not_record);
   return UNITY_END();
 }

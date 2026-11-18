@@ -354,6 +354,7 @@ void Ui::drawConfig() {
 // ---------------------------------------------------------------- keys
 
 void Ui::setTab(Tab t) {
+  if (tab_ == Config && t != Config) app_.flushSettings(millis());
   tab_ = t;
   if (t != Config) editing_ = false;
   if (t == Chat) app_.setViewing(chatPeer_ ? chatPeer_ : App::kNone);

@@ -167,9 +167,11 @@ bool pbDecodeUser(const uint8_t* in, size_t len, MeshUser& u) {
   return true;
 }
 
-size_t pbEncodeRoutingAck(uint8_t* out, size_t cap) {
+size_t pbEncodeRoutingAck(uint8_t* out, size_t cap) { return pbEncodeRoutingError(0, out, cap); }
+
+size_t pbEncodeRoutingError(uint32_t err, uint8_t* out, size_t cap) {
   Writer w(out, cap);
-  w.vfield(3, 0);
+  w.vfield(3, err);
   return w.result();
 }
 

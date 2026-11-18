@@ -109,7 +109,7 @@ uint32_t AirtimeBudget::usedMs(uint64_t nowMs) const {
   uint64_t m = nowMs / 60000;
   uint32_t sum = 0;
   for (size_t i = 0; i < kBuckets; i++)
-    if (used_[i] && minute_[i] <= m && m - minute_[i] < kBuckets) sum += ms_[i];
+    if (used_[i] && minute_[i] <= m && m - minute_[i] <= 60) sum += ms_[i];
   return sum;
 }
 
