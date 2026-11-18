@@ -43,6 +43,9 @@ jobs:
           key: pio-native-${{ runner.os }}-${{ env.PLATFORMIO_VERSION }}-${{ hashFiles('firmwares/m5-mesh-hello/platformio.ini') }}
       - name: Install PlatformIO
         run: python -m pip install "platformio==${PLATFORMIO_VERSION}"
+      # Relative links and anchors in README*.md and docs/**/*.md.
+      - name: Link check
+        run: python tools/check_links.py
       # Includes test_docs_regions, which checks the region table in
       # docs/en/frequencies.md against src/mesh/region.*.
       - name: Native tests

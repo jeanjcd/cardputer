@@ -68,7 +68,15 @@ ASan/UBSan need the sanitizer runtimes, which GCC/Clang provide on Linux and mac
 
 ### Docs check
 
-`test/test_docs_regions` parses the table between `<!-- regions:begin -->` and `<!-- regions:end -->` in `docs/en/frequencies.md` and compares every row with the code: name and order, band edges, LongFast frequency, power limit, duty cycle and experimental flag. If you change the region table in code, update the doc in the same commit. The test runs in the `native` suite, so CI fails when they disagree. The test looks for the file relative to the project folder, with a fallback relative to its own source path.
+`test/test_docs_regions` parses the table between `<!-- regions:begin -->` and `<!-- regions:end -->` in `docs/en/frequencies.md` and compares every row with the code: name and order, band edges, LongFast frequency, power limit, duty cycle and experimental flag. If you change the region table in code, update the doc in the same commit. The test runs in the `native` suite, so CI fails when they disagree. The test looks for the file relative to the project folder, with a fallback relative to its own source path. Only the English file is checked; the translations in `docs/pt-BR/`, `docs/es/` and `docs/ru/` reproduce the table without the markers.
+
+### Link check
+
+```sh
+python tools/check_links.py
+```
+
+[`tools/check_links.py`](../../tools/check_links.py) checks every relative link in `README*.md` and `docs/**/*.md`: the target file or folder must exist, and a `#fragment` must match a heading in the target Markdown file (GitHub-style anchors). External `http(s)` links are not checked. CI runs it in the native-tests job.
 
 ## Regenerating test vectors
 
@@ -91,7 +99,7 @@ The generator is deterministic. The output must be byte-identical unless you cha
 
 | Job | What it does |
 |---|---|
-| Native tests | `pio test -e native` on ubuntu-latest (includes the docs check) |
+| Native tests | `python tools/check_links.py` (link check), then `pio test -e native` on ubuntu-latest (includes the docs check) |
 | Native tests (ASan + UBSan) | `pio test -e native_sanitize` |
 | Device build | Verifies the committed `bin/` images with `sha256sum -c SHA256SUMS`, runs `pio run -e cardputer`, and uploads an artifact with the release images, the CI-built `firmware.bin` and checksums |
 
